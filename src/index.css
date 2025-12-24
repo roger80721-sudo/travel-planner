@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #F7F4EB; /* 米色背景 */
+  color: #4A4A4A; /* 深灰文字 */
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* 隱藏捲軸但保留功能 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.input-style {
+  background-color: white;
+  border: 2px solid #ffedd5; /* orange-100 */
+  border-radius: 0.75rem; /* rounded-xl */
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  color: #374151;
+  outline: none;
+  width: 100%;
+}
+.input-style:focus {
+  border-color: #fdba74; /* orange-300 */
+}
