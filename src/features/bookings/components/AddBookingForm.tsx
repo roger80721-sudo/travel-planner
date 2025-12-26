@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlane, faBed, faTicket, faSuitcase } from '@fortawesome/free-solid-svg-icons'; // 修正：移除了沒用到的圖示
+import { faPlane, faBed, faTicket, faSuitcase, faImage, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import type { BookingItem } from './BookingCard';
 
 const TYPE_OPTIONS = [
@@ -31,6 +31,9 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
   const [arriveName, setArriveName] = useState('');
   const [baggage, setBaggage] = useState('');
 
+  // 住宿圖片欄位
+  const [imageUrl, setImageUrl] = useState('');
+
   useEffect(() => {
     if (initialData) {
       setType(initialData.type);
@@ -46,8 +49,22 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       setArriveCode(initialData.arriveCode || '');
       setArriveName(initialData.arriveName || '');
       setBaggage(initialData.baggage || '');
+      setImageUrl(initialData.imageUrl || '');
     }
   }, [initialData]);
+
+  // ▼▼▼ 新增：搜尋圖片的輔助函式 ▼▼▼
+  const handleSearchImage = () => {
+    if (!title && !provider) {
+      alert('請先輸入飯店名稱或地點喔！');
+      return;
+    }
+    // 搜尋關鍵字：地點 + 標題 (例如：大阪梅田大和魯內酒店)
+    const query = `${provider} ${title}`; 
+    const url = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`;
+    window.open(url, '_blank');
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +82,7 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       arriveCode: type === 'flight' ? arriveCode : undefined,
       arriveName: type === 'flight' ? arriveName : undefined,
       baggage: type === 'flight' ? baggage : undefined,
+      imageUrl: type === 'hotel' ? imageUrl : undefined,
     });
   };
 
@@ -107,7 +125,6 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
         {type === 'flight' && (
           <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 space-y-3">
             <h4 className="text-xs font-bold text-blue-500 mb-2">✈️ 航段資訊</h4>
-            
             <div className="flex space-x-2">
               <div className="w-1/3">
                 <label className="block text-[10px] font-bold text-gray-400 mb-1">出發代號</label>
@@ -118,7 +135,6 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
                 <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="桃園機場" className="w-full input-style" />
               </div>
             </div>
-
             <div className="flex space-x-2">
               <div className="w-1/3">
                 <label className="block text-[10px] font-bold text-gray-400 mb-1">抵達代號</label>
@@ -129,14 +145,50 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
                 <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="關西機場" className="w-full input-style" />
               </div>
             </div>
-
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 mb-1">
-                <FontAwesomeIcon icon={faSuitcase} className="mr-1" />
-                託運行李限額
-              </label>
+              <label className="block text-[10px] font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faSuitcase} className="mr-1" />託運行李限額</label>
               <input type="text" value={baggage} onChange={e => setBaggage(e.target.value)} placeholder="例如：23kg x 2" className="w-full input-style" />
             </div>
+          </div>
+        )}
+
+        {/* 住宿專屬圖片輸入區 */}
+        {type === 'hotel' && (
+          <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 space-y-3">
+             <h4 className="text-xs font-bold text-emerald-600 mb-2">🏨 住宿外觀圖片</h4>
+             <div>
+                <label className="block text-xs font-bold text-gray-400 mb-1">
+                  <FontAwesomeIcon icon={faImage} className="mr-1" />
+                  圖片網址 (URL)
+                </label>
+                
+                {/* ▼▼▼ 新增：輸入框 + 搜尋按鈕的組合 ▼▼▼ */}
+                <div className="flex space-x-2">
+                  <input 
+                    type="url" 
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="flex-1 input-style text-blue-500"
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleSearchImage}
+                    className="bg-emerald-200 text-emerald-700 px-3 rounded-xl text-xs font-bold hover:bg-emerald-300 transition-colors whitespace-nowrap"
+                  >
+                    <FontAwesomeIcon icon={faMagnifyingGlass} className="mr-1" />
+                    搜尋圖片
+                  </button>
+                </div>
+                {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+
+                {imageUrl && (
+                  <div className="mt-2 h-32 w-full rounded-lg overflow-hidden bg-gray-100 border border-gray-200 relative">
+                    <img src={imageUrl} alt="預覽" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-tl-lg">預覽</div>
+                  </div>
+                )}
+              </div>
           </div>
         )}
 

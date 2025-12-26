@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlane, faBed, faTicket, faCopy, faLink, faTrashCan, faPen, faSuitcaseRolling } from '@fortawesome/free-solid-svg-icons'; // 修正：移除了沒用到的圖示
+import { faPlane, faBed, faTicket, faCopy, faLink, faTrashCan, faPen, faSuitcaseRolling, faLocationDot } from '@fortawesome/free-solid-svg-icons';
 
 // 定義資料格式
 export interface BookingItem {
@@ -13,11 +13,16 @@ export interface BookingItem {
   price?: string;      
   link?: string;       
   
+  // 機票專屬
   departCode?: string;
   departName?: string;
   arriveCode?: string;
   arriveName?: string;
-  baggage?: string;   
+  baggage?: string;
+
+  // ▼▼▼ 新增：住宿專屬圖片 ▼▼▼
+  imageUrl?: string;
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 }
 
 const TYPE_CONFIG = {
@@ -54,7 +59,7 @@ export const BookingCard = ({ item, onEdit, onDelete }: BookingCardProps) => {
             </div>
             <div>
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">{config.label}</span>
-              <h3 className="text-lg font-bold text-gray-700 leading-tight">
+              <h3 className="text-lg font-bold text-gray-700 leading-tight break-all">
                 {item.type === 'flight' ? item.provider : item.title}
               </h3>
             </div>
@@ -64,6 +69,24 @@ export const BookingCard = ({ item, onEdit, onDelete }: BookingCardProps) => {
              <button onClick={() => onDelete(item.id)} className="p-2 text-gray-300 hover:text-red-400"><FontAwesomeIcon icon={faTrashCan} /></button>
           </div>
         </div>
+
+        {/* ▼▼▼ 新增：住宿專屬圖片顯示區 ▼▼▼ */}
+        {item.type === 'hotel' && item.imageUrl && (
+          <div className="mb-3 rounded-xl overflow-hidden h-48 relative">
+            <img 
+              src={item.imageUrl} 
+              alt={item.title}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              onError={(e) => (e.currentTarget.style.display = 'none')} // 圖片讀取失敗時隱藏
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+            <div className="absolute bottom-2 left-3 text-white text-xs font-bold flex items-center">
+              <FontAwesomeIcon icon={faLocationDot} className="mr-1" />
+              {item.provider} {/* 顯示飯店地點或訂房網 */}
+            </div>
+          </div>
+        )}
+        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
 
         {/* 機票專屬：飛行路徑視覺化 */}
         {item.type === 'flight' && (
@@ -101,15 +124,15 @@ export const BookingCard = ({ item, onEdit, onDelete }: BookingCardProps) => {
           </div>
         )}
 
-        {/* 一般資訊區 */}
+        {/* 一般資訊區 (非機票顯示) */}
         {item.type !== 'flight' && (
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="bg-gray-50 rounded-lg p-2">
-              <span className="text-[10px] text-gray-400 block">日期時間</span>
+              <span className="text-[10px] text-gray-400 block">入住時間</span>
               <span className="text-sm font-bold text-gray-600">{item.date} {item.time}</span>
             </div>
             <div className="bg-gray-50 rounded-lg p-2">
-              <span className="text-[10px] text-gray-400 block">供應商/地點</span>
+              <span className="text-[10px] text-gray-400 block">訂房來源/地點</span>
               <span className="text-sm font-bold text-gray-600 truncate">{item.provider}</span>
             </div>
           </div>
@@ -123,7 +146,7 @@ export const BookingCard = ({ item, onEdit, onDelete }: BookingCardProps) => {
               className="flex-1 bg-orange-50 border border-orange-100 rounded-xl p-2 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform"
             >
               <span className="text-[10px] text-orange-400 font-bold mb-1">訂位代號 (點擊複製)</span>
-              <div className="flex items-center space-x-2 text-orange-600 font-mono font-black text-lg">
+              <div className="flex items-center space-x-2 text-orange-600 font-mono font-black text-lg truncate w-full justify-center">
                 <span>{item.reference}</span>
                 <FontAwesomeIcon icon={faCopy} className="text-xs opacity-50" />
               </div>

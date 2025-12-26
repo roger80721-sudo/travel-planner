@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'; // 引入 DND
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 import { BookingCard, type BookingItem } from './components/BookingCard';
 import { AddBookingForm } from './components/AddBookingForm';
@@ -14,8 +14,15 @@ const INITIAL_BOOKINGS: BookingItem[] = [
     departCode: 'TPE', departName: '桃園機場', arriveCode: 'KIX', arriveName: '關西機場', baggage: '23kg'
   },
   { 
-    id: '2', type: 'hotel', title: '大阪梅田大和魯內酒店', provider: 'Agoda', 
-    date: '2025-02-27', time: '15:00', reference: 'HB-29384' 
+    id: '2', 
+    type: 'hotel', 
+    title: '大阪梅田大和魯內酒店', 
+    provider: 'Agoda', 
+    date: '2025-02-27', 
+    time: '15:00', 
+    reference: 'HB-29384',
+    // 新增：示範用旅館圖片 URL
+    imageUrl: 'https://cf.bstatic.com/xdata/images/hotel/max1024x768/485658494.jpg?k=4230400267510420180163839153173817303037365240238886336101501342&o=&hp=1'
   }
 ];
 
@@ -48,7 +55,7 @@ export const BookingsPage = () => {
     }
   };
 
-  // 拖拉排序邏輯 (只負責換位置)
+  // 拖拉排序邏輯
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const sourceIndex = result.source.index;
@@ -82,7 +89,6 @@ export const BookingsPage = () => {
         ))}
       </div>
 
-      {/* 拖拉區域 (只有在 "全部" 模式下才啟用拖拉，避免篩選後索引錯亂) */}
       <div className="space-y-4">
         {filterType === 'all' ? (
           <DragDropContext onDragEnd={handleDragEnd}>
@@ -113,7 +119,6 @@ export const BookingsPage = () => {
             </Droppable>
           </DragDropContext>
         ) : (
-          // 如果有篩選，就不給拖拉 (直接顯示列表)
           filteredBookings.map(item => (
             <BookingCard 
               key={item.id} 
