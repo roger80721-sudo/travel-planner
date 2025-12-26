@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faUserGroup, faTrashCan, faCoins } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faUserGroup, faTrashCan, faCoins, faArrowsRotate } from '@fortawesome/free-solid-svg-icons';
 import { ExpenseCard, type ExpenseItem } from './components/ExpenseCard';
 import { AddExpenseForm } from './components/AddExpenseForm';
 import { Modal } from '../../components/ui/Modal';
@@ -32,7 +32,6 @@ export const ExpensePage = () => {
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
-  // 新增：匯率設定
   const [exchangeRate, setExchangeRate] = useState<number>(() => {
     const saved = localStorage.getItem('travel-exchange-rate');
     return saved ? Number(saved) : 0.22;
@@ -42,26 +41,49 @@ export const ExpensePage = () => {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   const [newMemberName, setNewMemberName] = useState('');
+  
+  // 新增：更新匯率的讀取狀態
+  const [isUpdatingRate, setIsUpdatingRate] = useState(false);
 
   useEffect(() => { localStorage.setItem('travel-members', JSON.stringify(members)); }, [members]);
   useEffect(() => { localStorage.setItem('travel-expenses-data', JSON.stringify(expenses)); }, [expenses]);
   useEffect(() => { localStorage.setItem('travel-exchange-rate', exchangeRate.toString()); }, [exchangeRate]);
 
-  // 統計邏輯 (統一換算成台幣計算)
+  // ▼▼▼ 新增：抓取即時匯率的功能 ▼▼▼
+  const handleRefreshRate = async () => {
+    setIsUpdatingRate(true);
+    try {
+      // 使用免費的公開 API 抓取日幣匯率
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/JPY');
+      const data = await response.json();
+      const newRate = data.rates.TWD;
+      
+      if (newRate) {
+        setExchangeRate(newRate);
+        alert(`匯率更新成功！\n目前 1 JPY ≈ ${newRate} TWD`);
+      } else {
+        throw new Error('無法取得匯率');
+      }
+    } catch (error) {
+      alert('匯率更新失敗，請檢查網路連線，或是稍後再試。');
+      console.error(error);
+    } finally {
+      setIsUpdatingRate(false);
+    }
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
   const calculateSummary = () => {
     const summary: Record<string, { paid: number; consumed: number }> = {};
     members.forEach(m => summary[m] = { paid: 0, consumed: 0 });
 
     expenses.forEach(item => {
-      // 如果是日幣，換算成台幣；如果是台幣，直接用
       const amountTWD = item.currency === 'JPY' ? item.amount * exchangeRate : item.amount;
 
-      // 1. 誰先付的 (以台幣計)
       if (summary[item.payer || '我']) {
         summary[item.payer || '我'].paid += amountTWD;
       }
 
-      // 2. 分攤給誰
       const targets = item.involved && item.involved.length > 0 ? item.involved : members;
       const splitAmount = amountTWD / targets.length;
 
@@ -103,7 +125,6 @@ export const ExpensePage = () => {
     }
   };
 
-  // 總金額 (換算成台幣顯示，因為這通常是最終成本)
   const totalAmountTWD = expenses.reduce((sum, item) => {
     return sum + (item.currency === 'JPY' ? item.amount * exchangeRate : item.amount);
   }, 0);
@@ -123,14 +144,24 @@ export const ExpensePage = () => {
                 <span className="text-[10px] font-bold">匯率 0.</span>
                 <input 
                   type="number" 
-                  value={Math.round(exchangeRate * 1000)} // 顯示 220 比較好打，或者直接顯示小數點
+                  value={Math.round(exchangeRate * 1000)}
                   onChange={(e) => {
-                     // 簡單處理：使用者輸入 "22" 代表 0.22
                      const val = Number(e.target.value);
-                     setExchangeRate(val > 10 ? val / 1000 : val / 100); // 容錯處理
+                     setExchangeRate(val > 10 ? val / 1000 : val / 100);
                   }}
                   className="w-8 bg-transparent text-[10px] font-mono font-bold text-center outline-none border-b border-white/30 focus:border-white"
                 />
+                
+                {/* ▼▼▼ 匯率刷新按鈕 ▼▼▼ */}
+                <button 
+                  onClick={handleRefreshRate}
+                  disabled={isUpdatingRate}
+                  className={`ml-1 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/40 transition-all ${isUpdatingRate ? 'animate-spin' : ''}`}
+                  title="點擊更新即時匯率"
+                >
+                  <FontAwesomeIcon icon={faArrowsRotate} className="text-[10px]" />
+                </button>
+                {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
              </div>
            </div>
            
@@ -142,7 +173,6 @@ export const ExpensePage = () => {
            </button>
         </div>
         
-        {/* 代墊統計 */}
         <div className="mt-6 pt-4 border-t border-white/20">
           <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-2">
             {members.map(m => (
@@ -155,13 +185,12 @@ export const ExpensePage = () => {
         </div>
       </div>
 
-      {/* 記帳列表 */}
       <div className="space-y-4">
         {expenses.map(item => (
           <ExpenseCard 
             key={item.id} 
             item={item} 
-            exchangeRate={exchangeRate} // 傳入匯率給卡片做換算顯示
+            exchangeRate={exchangeRate}
             onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
             onDelete={handleDelete}
           />
