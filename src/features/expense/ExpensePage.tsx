@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faUserGroup, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faUserGroup, faTrashCan, faCoins } from '@fortawesome/free-solid-svg-icons';
 import { ExpenseCard, type ExpenseItem } from './components/ExpenseCard';
 import { AddExpenseForm } from './components/AddExpenseForm';
 import { Modal } from '../../components/ui/Modal';
@@ -10,8 +10,14 @@ const INITIAL_EXPENSES: ExpenseItem[] = [
   { 
     id: '1', title: '環球影城門票', amount: 18400, date: '2025-02-27', 
     payer: '我', involved: ['我', '旅伴 A'], 
-    method: 'card', category: 'entertainment',
+    method: 'card', category: 'entertainment', currency: 'JPY',
     location: 'USJ', photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Universal_Globe.jpg/800px-Universal_Globe.jpg'
+  },
+  {
+    id: '2', title: '行前買網卡', amount: 500, date: '2025-02-20',
+    payer: '我', involved: ['我'],
+    method: 'card', category: 'other', currency: 'TWD',
+    location: '台灣'
   }
 ];
 
@@ -26,6 +32,12 @@ export const ExpensePage = () => {
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
+  // 新增：匯率設定
+  const [exchangeRate, setExchangeRate] = useState<number>(() => {
+    const saved = localStorage.getItem('travel-exchange-rate');
+    return saved ? Number(saved) : 0.22;
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
@@ -33,19 +45,25 @@ export const ExpensePage = () => {
 
   useEffect(() => { localStorage.setItem('travel-members', JSON.stringify(members)); }, [members]);
   useEffect(() => { localStorage.setItem('travel-expenses-data', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('travel-exchange-rate', exchangeRate.toString()); }, [exchangeRate]);
 
+  // 統計邏輯 (統一換算成台幣計算)
   const calculateSummary = () => {
     const summary: Record<string, { paid: number; consumed: number }> = {};
     members.forEach(m => summary[m] = { paid: 0, consumed: 0 });
 
     expenses.forEach(item => {
-      const amount = Number(item.amount);
+      // 如果是日幣，換算成台幣；如果是台幣，直接用
+      const amountTWD = item.currency === 'JPY' ? item.amount * exchangeRate : item.amount;
+
+      // 1. 誰先付的 (以台幣計)
       if (summary[item.payer || '我']) {
-        summary[item.payer || '我'].paid += amount;
+        summary[item.payer || '我'].paid += amountTWD;
       }
 
+      // 2. 分攤給誰
       const targets = item.involved && item.involved.length > 0 ? item.involved : members;
-      const splitAmount = amount / targets.length;
+      const splitAmount = amountTWD / targets.length;
 
       targets.forEach(member => {
         if (summary[member]) {
@@ -85,16 +103,37 @@ export const ExpensePage = () => {
     }
   };
 
-  const totalAmount = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
+  // 總金額 (換算成台幣顯示，因為這通常是最終成本)
+  const totalAmountTWD = expenses.reduce((sum, item) => {
+    return sum + (item.currency === 'JPY' ? item.amount * exchangeRate : item.amount);
+  }, 0);
 
   return (
     <div className="pb-24 px-4 pt-4">
+      {/* 總金額卡片 */}
       <div className="bg-[#5C4033] text-white rounded-3xl p-6 shadow-xl mb-6 relative overflow-hidden">
         <div className="relative z-10 flex justify-between items-start">
            <div>
-             <p className="text-xs font-bold opacity-70 mb-1">旅費總支出 (日幣)</p>
-             <h2 className="text-4xl font-black font-mono">¥ {totalAmount.toLocaleString()}</h2>
+             <p className="text-xs font-bold opacity-70 mb-1">旅費總支出 (約台幣)</p>
+             <h2 className="text-4xl font-black font-mono">NT$ {Math.round(totalAmountTWD).toLocaleString()}</h2>
+             
+             {/* 匯率設定小工具 */}
+             <div className="flex items-center space-x-2 mt-2 bg-black/20 w-fit px-2 py-1 rounded-lg">
+                <FontAwesomeIcon icon={faCoins} className="text-xs text-orange-200" />
+                <span className="text-[10px] font-bold">匯率 0.</span>
+                <input 
+                  type="number" 
+                  value={Math.round(exchangeRate * 1000)} // 顯示 220 比較好打，或者直接顯示小數點
+                  onChange={(e) => {
+                     // 簡單處理：使用者輸入 "22" 代表 0.22
+                     const val = Number(e.target.value);
+                     setExchangeRate(val > 10 ? val / 1000 : val / 100); // 容錯處理
+                  }}
+                  className="w-8 bg-transparent text-[10px] font-mono font-bold text-center outline-none border-b border-white/30 focus:border-white"
+                />
+             </div>
            </div>
+           
            <button 
              onClick={() => setIsMemberModalOpen(true)}
              className="bg-white/20 hover:bg-white/30 p-2 rounded-xl backdrop-blur-sm transition-colors"
@@ -103,23 +142,26 @@ export const ExpensePage = () => {
            </button>
         </div>
         
+        {/* 代墊統計 */}
         <div className="mt-6 pt-4 border-t border-white/20">
           <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-2">
             {members.map(m => (
               <div key={m} className="flex-shrink-0">
                 <div className="text-[10px] opacity-70 mb-0.5">{m} 代墊</div>
-                <div className="font-bold font-mono">¥ {Math.round(summary[m]?.paid || 0).toLocaleString()}</div>
+                <div className="font-bold font-mono">NT$ {Math.round(summary[m]?.paid || 0).toLocaleString()}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* 記帳列表 */}
       <div className="space-y-4">
         {expenses.map(item => (
           <ExpenseCard 
             key={item.id} 
             item={item} 
+            exchangeRate={exchangeRate} // 傳入匯率給卡片做換算顯示
             onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
             onDelete={handleDelete}
           />
@@ -155,18 +197,16 @@ export const ExpensePage = () => {
           <div className="bg-orange-50 p-3 rounded-xl text-xs text-[#5C4033]">
              💡 這裡設定的人名，會在記帳時用來選擇「誰付錢」和「幫誰付錢」。
           </div>
-          
           <div className="flex space-x-2">
             <input 
               type="text" 
               value={newMemberName}
               onChange={e => setNewMemberName(e.target.value)}
-              placeholder="輸入名字 (例如: 媽媽)"
+              placeholder="輸入名字"
               className="flex-1 bg-gray-50 border-2 border-transparent focus:border-orange-300 rounded-xl px-4 py-2 outline-none font-bold text-gray-700"
             />
             <button onClick={addMember} className="bg-[#5C4033] text-white px-4 rounded-xl font-bold">新增</button>
           </div>
-
           <div className="space-y-2 max-h-[50vh] overflow-y-auto">
             {members.map(m => (
               <div key={m} className="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-xl">

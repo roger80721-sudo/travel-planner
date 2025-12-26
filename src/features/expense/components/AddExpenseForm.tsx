@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faUtensils, faTrainSubway, faBagShopping, faTicket, faEllipsis, 
   faMoneyBill, faCreditCard, faMobileScreen, faIdCard,
-  faLocationDot, faImage, faMagnifyingGlass
+  faLocationDot, faImage, faMagnifyingGlass, faRightLeft
 } from '@fortawesome/free-solid-svg-icons';
 import type { ExpenseItem } from './ExpenseCard';
 
@@ -41,6 +41,9 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
   const [location, setLocation] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
 
+  // 新增：幣別狀態，預設日幣
+  const [currency, setCurrency] = useState<'JPY' | 'TWD'>('JPY');
+
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title);
@@ -52,6 +55,8 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
       setMethod(initialData.method || 'cash');
       setLocation(initialData.location || '');
       setPhotoUrl(initialData.photoUrl || '');
+      // 載入幣別
+      setCurrency(initialData.currency || 'JPY');
     }
   }, [initialData, members]);
 
@@ -84,23 +89,48 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
       involved,
       method: method as any,
       location,
-      photoUrl
+      photoUrl,
+      currency // 送出幣別
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto px-1">
-      <div className="flex space-x-3">
+      
+      {/* 1. 金額與幣別 (修改這區塊) */}
+      <div className="flex space-x-3 items-end">
         <div className="flex-1">
           <label className="label-text">名稱</label>
           <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：章魚燒" className="input-style w-full" autoFocus />
         </div>
-        <div className="w-1/3">
-          <label className="label-text">金額 (¥)</label>
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="input-style w-full font-mono text-right" />
+        <div className="w-2/5">
+          <label className="label-text flex justify-between items-center mb-1">
+            <span>金額</span>
+            <button 
+              type="button" 
+              onClick={() => setCurrency(prev => prev === 'JPY' ? 'TWD' : 'JPY')}
+              className="text-[10px] bg-gray-200 px-2 py-0.5 rounded-md hover:bg-gray-300 transition-colors flex items-center"
+            >
+              <FontAwesomeIcon icon={faRightLeft} className="mr-1 text-gray-500" />
+              {currency}
+            </button>
+          </label>
+          <div className="relative">
+             <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400">
+               {currency === 'JPY' ? '¥' : 'NT'}
+             </span>
+             <input 
+               type="number" 
+               value={amount} 
+               onChange={e => setAmount(e.target.value)} 
+               placeholder="0" 
+               className={`input-style w-full font-mono text-right pl-8 ${currency === 'TWD' ? 'text-green-600 border-green-200 focus:border-green-400' : ''}`} 
+             />
+          </div>
         </div>
       </div>
 
+      {/* 2. 分類與日期 */}
       <div>
         <label className="label-text mb-2 block">分類</label>
         <div className="flex justify-between space-x-2 overflow-x-auto pb-1 no-scrollbar">
@@ -119,6 +149,7 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
         </div>
       </div>
 
+      {/* 3. 付款人與支付方式 */}
       <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-3">
         <div className="flex items-center space-x-2">
            <label className="label-text w-16">付款人</label>
@@ -152,6 +183,7 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
         </div>
       </div>
 
+      {/* 4. 分攤給誰 */}
       <div>
         <label className="label-text mb-1 block">分攤給誰 (平均分攤)</label>
         <div className="flex flex-wrap gap-2">
@@ -171,6 +203,7 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
         </div>
       </div>
 
+      {/* 5. 地點與照片 */}
       <div className="space-y-2">
         <div className="flex space-x-2">
           <div className="flex items-center justify-center w-8 text-gray-400"><FontAwesomeIcon icon={faLocationDot} /></div>

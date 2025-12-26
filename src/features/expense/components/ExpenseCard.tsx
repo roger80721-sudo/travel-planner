@@ -2,15 +2,15 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faUtensils, faTrainSubway, faBagShopping, faTicket, faEllipsis, 
   faPen, faTrashCan, faLocationDot, faMoneyBill, faCreditCard, faMobileScreen, faIdCard, faUserGroup 
-} from '@fortawesome/free-solid-svg-icons';
+} from '@fortawesome/free-solid-svg-icons'; // 修正：已移除沒用到的 faYenSign, faDollarSign
 
-// ★★★ 這裡一定要有 export 喔！ ★★★
 export interface ExpenseItem {
   id: string;
   title: string;
   amount: number;
   category: string;
   date: string;
+  currency?: 'JPY' | 'TWD'; 
   payer?: string;
   involved?: string[];
   method?: 'cash' | 'card' | 'suica' | 'mobile';
@@ -35,26 +35,30 @@ const METHODS: Record<string, any> = {
 
 interface ExpenseCardProps {
   item: ExpenseItem;
+  exchangeRate: number;
   onEdit: (item: ExpenseItem) => void;
   onDelete: (id: string) => void;
 }
 
-// ★★★ 這裡也要有 export ★★★
-export const ExpenseCard = ({ item, onEdit, onDelete }: ExpenseCardProps) => {
+export const ExpenseCard = ({ item, exchangeRate, onEdit, onDelete }: ExpenseCardProps) => {
   const cat = CATEGORIES[item.category] || CATEGORIES.other;
   const payMethod = METHODS[item.method || 'cash'];
   const involvedCount = item.involved?.length || 0;
   const involvedText = involvedCount > 0 ? `${involvedCount} 人分攤` : '全員分攤';
 
+  // 預設為日幣
+  const currency = item.currency || 'JPY';
+
   return (
     <div className="bg-white rounded-2xl shadow-[4px_4px_0px_0px_#E0E5D5] border-2 border-transparent hover:border-orange-200 transition-all overflow-hidden relative group">
+      
       {item.photoUrl && (
         <div className="h-32 w-full relative overflow-hidden">
           <img 
             src={item.photoUrl} 
             alt={item.title} 
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-            onError={(e) => (e.currentTarget.style.display = 'none')}
+            onError={(e) => (e.currentTarget.style.display = 'none')} 
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           <div className="absolute bottom-2 left-3 text-white text-xs font-bold flex items-center">
@@ -73,19 +77,32 @@ export const ExpenseCard = ({ item, onEdit, onDelete }: ExpenseCardProps) => {
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-start mb-1">
             <h3 className="font-bold text-gray-700 truncate">{item.title}</h3>
-            <span className="font-black text-lg text-gray-800 font-mono">
-              ¥ {Number(item.amount).toLocaleString()}
-            </span>
+            
+            <div className="text-right">
+              {/* 主要金額顯示 */}
+              <div className={`font-black text-lg font-mono ${currency === 'TWD' ? 'text-green-600' : 'text-gray-800'}`}>
+                {currency === 'JPY' ? '¥' : 'NT$'} {Number(item.amount).toLocaleString()}
+              </div>
+              
+              {/* 如果是日幣，顯示換算後的台幣 */}
+              {currency === 'JPY' && (
+                <div className="text-[10px] font-bold text-gray-400">
+                  ≈ NT$ {Math.round(item.amount * exchangeRate).toLocaleString()}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center flex-wrap gap-2 text-[10px] font-bold text-gray-400">
              <span>{item.date}</span>
+             
              <span className="bg-gray-100 px-2 py-0.5 rounded-md flex items-center text-gray-500">
                {item.payer || '我'}
                <span className="mx-1">•</span>
                <FontAwesomeIcon icon={payMethod.icon} className="mr-1" />
                {payMethod.label}
              </span>
+
              <span className="flex items-center text-orange-400">
                <FontAwesomeIcon icon={faUserGroup} className="mr-1" />
                {involvedText}
