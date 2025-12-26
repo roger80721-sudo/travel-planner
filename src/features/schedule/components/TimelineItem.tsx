@@ -1,141 +1,91 @@
-import {
-  faBagShopping,
-  faBed,
-  faBolt,
-  faCamera,
-  faCloud, faCloudRain,
-  faMagnifyingGlass // 新增放大鏡圖示
-  ,
-  faMapLocationDot,
-  faSnowflake,
-  faSun,
-  faTrain,
-  faUtensils
-} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
+  faLocationDot, faClock, faCloudSun 
+} from '@fortawesome/free-solid-svg-icons'; // 修正：移除了沒用到的 faPlane
 
 export interface ScheduleItem {
   id: string;
   time: string;
+  type: 'transport' | 'food' | 'hotel' | 'activity' | 'shopping';
   title: string;
-  location?: string;
-  type: 'sightseeing' | 'food' | 'transport' | 'accommodation' | 'shopping';
-  weather?: 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'storm';
   duration?: string;
-  notes?: string;
+  location?: string;
+  weather?: string;
 }
 
 const TYPE_CONFIG = {
-  sightseeing: { color: 'bg-orange-300', icon: faCamera, label: '景點' },
-  food:        { color: 'bg-red-400',    icon: faUtensils, label: '美食' },
-  transport:   { color: 'bg-blue-300',   icon: faTrain,    label: '交通' },
-  accommodation:{ color: 'bg-[#88A096]', icon: faBed,      label: '住宿' },
-  shopping:    { color: 'bg-yellow-300', icon: faBagShopping, label: '購物' },
-};
-
-const WEATHER_CONFIG = {
-  sunny:  { icon: faSun,       color: 'text-orange-400', label: '晴天' },
-  cloudy: { icon: faCloud,     color: 'text-gray-400',   label: '多雲' },
-  rainy:  { icon: faCloudRain, color: 'text-blue-400',   label: '雨天' },
-  snowy:  { icon: faSnowflake, color: 'text-blue-200',   label: '下雪' },
-  storm:  { icon: faBolt,      color: 'text-yellow-500', label: '雷雨' },
+  transport: { icon: faTrainSubway, color: 'text-blue-500', bg: 'bg-blue-100', border: 'border-blue-200' },
+  food:      { icon: faUtensils,    color: 'text-orange-500', bg: 'bg-orange-100', border: 'border-orange-200' },
+  hotel:     { icon: faBed,         color: 'text-indigo-500', bg: 'bg-indigo-100', border: 'border-indigo-200' },
+  activity:  { icon: faCamera,      color: 'text-green-600',  bg: 'bg-green-100', border: 'border-green-200' },
+  shopping:  { icon: faBagShopping, color: 'text-pink-500',   bg: 'bg-pink-100', border: 'border-pink-200' },
 };
 
 interface TimelineItemProps {
   item: ScheduleItem;
-  isLast?: boolean;
+  isLast: boolean;
   onClick: (item: ScheduleItem) => void;
 }
 
 export const TimelineItem = ({ item, isLast, onClick }: TimelineItemProps) => {
-  const config = TYPE_CONFIG[item.type];
-  const weatherInfo = item.weather ? WEATHER_CONFIG[item.weather] : null;
-
-  // 這是一個防止點擊連結時，觸發「編輯視窗」的小功能
-  const handleLinkClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
+  const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.activity;
 
   return (
-    <div className="flex group">
-      {/* 左側時間 */}
-      <div className="flex flex-col items-end mr-4 w-12 pt-1">
-        <span className="text-sm font-bold text-[#5C4033] font-mono">{item.time}</span>
-        {item.duration && (
-          <span className="text-[10px] text-gray-400 mt-1 bg-gray-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-            {item.duration}
-          </span>
-        )}
+    <div className="flex group relative pl-2">
+      {/* 左側時間軸線 (虛線) */}
+      {!isLast && (
+        <div className="absolute left-[27px] top-10 bottom-0 w-0.5 border-l-2 border-dashed border-[#d1cfc7]" />
+      )}
+
+      {/* 左側時間與圖示 */}
+      <div className="flex flex-col items-center mr-4 relative z-10">
+        <div className="text-[10px] font-black text-[#796C53] mb-1 font-mono">{item.time}</div>
+        <div className={`
+          w-10 h-10 rounded-full border-4 border-[#F2F4E7] shadow-sm flex items-center justify-center
+          ${config.bg} ${config.color}
+        `}>
+          <FontAwesomeIcon icon={config.icon} className="text-sm" />
+        </div>
       </div>
 
-      {/* 中間軸線 */}
-      <div className="relative flex flex-col items-center mr-4">
-        <div className={`w-4 h-4 rounded-full border-2 border-white z-10 shadow-sm ${config.color}`} />
-        {!isLast && (
-          <div className="w-0.5 flex-grow bg-gray-200 border-l-2 border-dashed border-gray-300 my-1" />
-        )}
-      </div>
+      {/* 右側卡片 (DIY 方程式卡片風格) */}
+      <div 
+        onClick={() => onClick(item)}
+        className={`
+          flex-1 mb-6 relative cursor-pointer transition-transform active:scale-95
+          bg-[#FFFAFA] rounded-[24px] border-2 border-white
+          shadow-[4px_4px_0px_0px_rgba(121,108,83,0.1)] hover:shadow-[4px_4px_0px_0px_rgba(121,108,83,0.2)]
+        `}
+      >
+        {/* 卡片裝飾：左上角的彩色膠帶效果 */}
+        <div className={`absolute -top-2 left-6 w-8 h-3 ${config.bg} opacity-50 rotate-[-5deg]`} />
 
-      {/* 右側卡片 */}
-      <div className="flex-1 pb-8">
-        <div 
-          onClick={() => onClick(item)}
-          className="bg-white rounded-2xl border-2 border-transparent shadow-[4px_4px_0px_0px_#E0E5D5] p-4 flex flex-col relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer hover:border-orange-200"
-        >
-          <div className={`absolute left-0 top-0 bottom-0 w-2 ${config.color}`} />
-          
-          <div className="pl-2 flex justify-between items-start mb-1">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md text-white ${config.color}`}>
-              {config.label}
-            </span>
-            
-            {/* 顯示天氣圖示 (如果你有手動設定的話) */}
-            {weatherInfo && (
-              <div className={`flex items-center space-x-1 ${weatherInfo.color}`}>
-                <FontAwesomeIcon icon={weatherInfo.icon} className="text-lg" />
-              </div>
-            )}
+        <div className="p-4">
+          <div className="flex justify-between items-start">
+            <h3 className="text-lg font-black text-[#5E5340] leading-tight mb-1">{item.title}</h3>
           </div>
           
-          <h3 className="pl-2 text-lg font-bold text-gray-700 leading-tight mb-1">{item.title}</h3>
-          
-          {/* ▼▼▼ 重點修改：地點與按鈕區 ▼▼▼ */}
-          {item.location && (
-            <div className="pl-2 mt-2 flex flex-wrap gap-2">
-              
-              {/* 1. 地圖按鈕 (藍色) */}
-              <a 
-                href={`https://www.google.com/maps/search/?api=1&query=${item.location}`}
-                target="_blank" 
-                rel="noreferrer"
-                onClick={handleLinkClick}
-                className="inline-flex items-center text-xs text-blue-600 font-bold hover:text-blue-800 bg-blue-50 border border-blue-100 px-2 py-1.5 rounded-lg transition-colors"
-              >
-                <FontAwesomeIcon icon={faMapLocationDot} className="mr-1.5" />
-                地圖
-              </a>
-
-              {/* 2. 氣象按鈕 (橘色) - 點下去會自動 Google 搜尋 */}
-              <a 
-                href={`https://www.google.com/search?q=${item.location}+天氣`}
-                target="_blank" 
-                rel="noreferrer"
-                onClick={handleLinkClick}
-                className="inline-flex items-center text-xs text-orange-600 font-bold hover:text-orange-800 bg-orange-50 border border-orange-100 px-2 py-1.5 rounded-lg transition-colors"
-              >
-                <FontAwesomeIcon icon={faMagnifyingGlass} className="mr-1.5" />
-                氣象
-              </a>
-
-            </div>
-          )}
-          {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
-          
-          {item.notes && (
-            <p className="ml-2 mt-2 text-xs text-gray-500 bg-[#F7F4EB] p-2 rounded-lg line-clamp-2">
-              {item.notes}
-            </p>
-          )}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {item.duration && (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg bg-[#F2F4E7] text-[#796C53] text-[10px] font-bold">
+                <FontAwesomeIcon icon={faClock} className="mr-1 opacity-60" />
+                {item.duration}
+              </span>
+            )}
+            {item.location && (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg bg-[#E0F2F1] text-[#00695C] text-[10px] font-bold">
+                <FontAwesomeIcon icon={faLocationDot} className="mr-1 opacity-60" />
+                {item.location}
+              </span>
+            )}
+            {item.weather && (
+              <span className="inline-flex items-center px-2 py-1 rounded-lg bg-[#FFF3E0] text-[#E65100] text-[10px] font-bold">
+                <FontAwesomeIcon icon={faCloudSun} className="mr-1 opacity-60" />
+                {item.weather}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
