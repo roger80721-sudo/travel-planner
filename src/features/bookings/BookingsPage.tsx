@@ -5,19 +5,33 @@ import { BookingCard, type BookingItem } from './components/BookingCard';
 import { AddBookingForm } from './components/AddBookingForm';
 import { Modal } from '../../components/ui/Modal';
 
+// 更新預設資料：加入機場代號與行李
 const INITIAL_BOOKINGS: BookingItem[] = [
   { 
-    id: '1', type: 'flight', title: '去程：台北 - 大阪', provider: '星宇航空 JX820', 
-    date: '2025-02-27', time: '08:30', reference: '6XK9P2', link: 'https://www.starlux-airlines.com' 
+    id: '1', 
+    type: 'flight', 
+    title: 'JX820', 
+    provider: '星宇航空', 
+    date: '2025-02-27', 
+    time: '08:30', 
+    reference: '6XK9P2', 
+    link: 'https://www.starlux-airlines.com',
+    departCode: 'TPE', departName: '桃園機場',
+    arriveCode: 'KIX', arriveName: '關西機場',
+    baggage: '23kg'
   },
   { 
-    id: '2', type: 'hotel', title: '大阪梅田大和魯內酒店', provider: 'Agoda', 
-    date: '2025-02-27', time: '15:00', reference: 'HB-29384' 
+    id: '2', 
+    type: 'hotel', 
+    title: '大阪梅田大和魯內酒店', 
+    provider: 'Agoda', 
+    date: '2025-02-27', 
+    time: '15:00', 
+    reference: 'HB-29384' 
   }
 ];
 
 export const BookingsPage = () => {
-  // 1. 讀取 LocalStorage
   const [bookings, setBookings] = useState<BookingItem[]>(() => {
     const saved = localStorage.getItem('travel-bookings-data');
     return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
@@ -27,12 +41,10 @@ export const BookingsPage = () => {
   const [editingItem, setEditingItem] = useState<BookingItem | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'flight' | 'hotel'>('all');
 
-  // 2. 自動存檔
   useEffect(() => {
     localStorage.setItem('travel-bookings-data', JSON.stringify(bookings));
   }, [bookings]);
 
-  // 新增/修改邏輯
   const handleSave = (formData: Omit<BookingItem, 'id'>) => {
     if (editingItem) {
       setBookings(prev => prev.map(item => item.id === editingItem.id ? { ...formData, id: item.id } : item));
@@ -42,21 +54,19 @@ export const BookingsPage = () => {
     setIsModalOpen(false);
   };
 
-  // 刪除邏輯
   const handleDelete = (id: string) => {
     if (window.confirm('確定要刪除這筆預訂嗎？')) {
       setBookings(prev => prev.filter(item => item.id !== id));
     }
   };
 
-  // 篩選顯示
   const filteredBookings = filterType === 'all' 
     ? bookings 
     : bookings.filter(b => b.type === filterType);
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {/* 頂部篩選按鈕 */}
+      {/* 篩選按鈕 */}
       <div className="flex space-x-2 mb-6 overflow-x-auto no-scrollbar">
         {['all', 'flight', 'hotel', 'activity'].map(type => (
           <button
