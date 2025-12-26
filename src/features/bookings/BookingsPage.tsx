@@ -1,33 +1,21 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'; // 引入 DND
+
 import { BookingCard, type BookingItem } from './components/BookingCard';
 import { AddBookingForm } from './components/AddBookingForm';
 import { Modal } from '../../components/ui/Modal';
 
-// 更新預設資料：加入機場代號與行李
 const INITIAL_BOOKINGS: BookingItem[] = [
   { 
-    id: '1', 
-    type: 'flight', 
-    title: 'JX820', 
-    provider: '星宇航空', 
-    date: '2025-02-27', 
-    time: '08:30', 
-    reference: '6XK9P2', 
-    link: 'https://www.starlux-airlines.com',
-    departCode: 'TPE', departName: '桃園機場',
-    arriveCode: 'KIX', arriveName: '關西機場',
-    baggage: '23kg'
+    id: '1', type: 'flight', title: 'JX820', provider: '星宇航空', 
+    date: '2025-02-27', time: '08:30', reference: '6XK9P2', link: 'https://www.starlux-airlines.com',
+    departCode: 'TPE', departName: '桃園機場', arriveCode: 'KIX', arriveName: '關西機場', baggage: '23kg'
   },
   { 
-    id: '2', 
-    type: 'hotel', 
-    title: '大阪梅田大和魯內酒店', 
-    provider: 'Agoda', 
-    date: '2025-02-27', 
-    time: '15:00', 
-    reference: 'HB-29384' 
+    id: '2', type: 'hotel', title: '大阪梅田大和魯內酒店', provider: 'Agoda', 
+    date: '2025-02-27', time: '15:00', reference: 'HB-29384' 
   }
 ];
 
@@ -60,44 +48,87 @@ export const BookingsPage = () => {
     }
   };
 
+  // 拖拉排序邏輯 (只負責換位置)
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+    if (sourceIndex === destinationIndex) return;
+
+    setBookings(prev => {
+      const newItems = Array.from(prev);
+      const [reorderedItem] = newItems.splice(sourceIndex, 1);
+      newItems.splice(destinationIndex, 0, reorderedItem);
+      return newItems;
+    });
+  };
+
   const filteredBookings = filterType === 'all' 
     ? bookings 
     : bookings.filter(b => b.type === filterType);
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {/* 篩選按鈕 */}
       <div className="flex space-x-2 mb-6 overflow-x-auto no-scrollbar">
         {['all', 'flight', 'hotel', 'activity'].map(type => (
           <button
             key={type}
             onClick={() => setFilterType(type as any)}
             className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-colors
-              ${filterType === type 
-                ? 'bg-[#5C4033] text-white shadow-lg' 
-                : 'bg-white text-gray-400 border border-transparent'}`}
+              ${filterType === type ? 'bg-[#5C4033] text-white shadow-lg' : 'bg-white text-gray-400 border border-transparent'}`}
           >
             {type === 'all' ? '全部' : type === 'flight' ? '機票' : type === 'hotel' ? '住宿' : '票券'}
           </button>
         ))}
       </div>
 
-      {/* 列表 */}
+      {/* 拖拉區域 (只有在 "全部" 模式下才啟用拖拉，避免篩選後索引錯亂) */}
       <div className="space-y-4">
-        {filteredBookings.map(item => (
-          <BookingCard 
-            key={item.id} 
-            item={item} 
-            onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
-            onDelete={handleDelete}
-          />
-        ))}
+        {filterType === 'all' ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="bookings-list">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {filteredBookings.map((item, index) => (
+                    <Draggable key={item.id} draggableId={item.id} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          style={{ ...provided.draggableProps.style, opacity: snapshot.isDragging ? 0.8 : 1 }}
+                        >
+                          <BookingCard 
+                            item={item} 
+                            onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
+                            onDelete={handleDelete}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        ) : (
+          // 如果有篩選，就不給拖拉 (直接顯示列表)
+          filteredBookings.map(item => (
+            <BookingCard 
+              key={item.id} 
+              item={item} 
+              onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
+              onDelete={handleDelete}
+            />
+          ))
+        )}
+        
         {filteredBookings.length === 0 && (
           <div className="text-center py-10 text-gray-400 opacity-50">沒有資料</div>
         )}
       </div>
 
-      {/* 新增按鈕 */}
       <button 
         onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
         className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-[#5C4033] text-white shadow-xl flex items-center justify-center text-2xl active:scale-90 transition-transform z-40"
@@ -105,16 +136,8 @@ export const BookingsPage = () => {
         <FontAwesomeIcon icon={faPlus} />
       </button>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        title={editingItem ? "編輯預訂" : "新增預訂"}
-      >
-        <AddBookingForm 
-          initialData={editingItem}
-          onSubmit={handleSave}
-          onCancel={() => setIsModalOpen(false)}
-        />
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "編輯預訂" : "新增預訂"}>
+        <AddBookingForm initialData={editingItem} onSubmit={handleSave} onCancel={() => setIsModalOpen(false)} />
       </Modal>
     </div>
   );
