@@ -7,6 +7,7 @@ import { BookingsPage } from './features/bookings/BookingsPage';
 import { ExpensePage } from './features/expense/ExpensePage';
 import { JournalPage } from './features/journal/JournalPage';
 import { PreparationPage } from './features/preparation/PreparationPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 
 function App() {
   return (
@@ -58,6 +59,16 @@ function App() {
           element={
             <MobileLayout title="準備清單">
               <PreparationPage />
+            </MobileLayout>
+          } 
+        />
+
+        {/* 6. 設定頁 */}
+        <Route 
+          path="/settings" 
+          element={
+            <MobileLayout title="設定">
+              <SettingsPage />
             </MobileLayout>
           } 
         />
