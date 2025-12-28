@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll
+  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, faLocationArrow
 } from '@fortawesome/free-solid-svg-icons';
 
 export interface ScheduleItem {
@@ -12,9 +12,8 @@ export interface ScheduleItem {
   duration?: string;
   location?: string;
   weather?: string;
-  // ▼▼▼ 新增：導遊小故事欄位 ▼▼▼
-  factSummary?: string; // 卡片上顯示的簡述
-  factDetails?: string; // 點進去看的詳細故事
+  factSummary?: string;
+  factDetails?: string;
 }
 
 const TYPE_CONFIG = {
@@ -28,14 +27,25 @@ const TYPE_CONFIG = {
 interface TimelineItemProps {
   item: ScheduleItem;
   isLast: boolean;
-  onEditClick: (item: ScheduleItem) => void; // 改名以區分
-  onFactClick: (item: ScheduleItem) => void; // 新增：點擊小知識的回呼
+  onEditClick: (item: ScheduleItem) => void;
+  onFactClick: (item: ScheduleItem) => void;
 }
 
 export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: TimelineItemProps) => {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.activity;
-  // 只有活動類且有填寫簡述時才顯示
   const hasFact = item.type === 'activity' && item.factSummary;
+
+  // 處理導航點擊
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 阻止冒泡，避免觸發編輯 Modal
+    if (item.location) {
+      // 開啟 Google Maps 導航模式 (travelmode=driving)
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.location)}&travelmode=driving`,
+        '_blank'
+      );
+    }
+  };
 
   return (
     <div className="flex group relative pl-2">
@@ -53,7 +63,7 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
         </div>
       </div>
 
-      {/* 卡片本體 (點擊觸發編輯) */}
+      {/* 卡片本體 */}
       <div 
         onClick={() => onEditClick(item)}
         className={`
@@ -67,7 +77,21 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
 
         <div className="p-4 pb-3">
           <div className="flex justify-between items-start">
-            <h3 className="text-lg font-black text-[#5E5340] leading-tight mb-1">{item.title}</h3>
+            <h3 className="text-lg font-black text-[#5E5340] leading-tight mb-1 flex-1">
+              {item.title}
+            </h3>
+            
+            {/* ▼▼▼ 新增：自駕導航按鈕 ▼▼▼ */}
+            {item.location && (
+              <button
+                onClick={handleNavigate}
+                className="ml-3 w-10 h-10 rounded-full bg-[#4285F4] text-white shadow-md flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform hover:bg-[#3367D6]"
+                title="導航到這裡"
+              >
+                <FontAwesomeIcon icon={faLocationArrow} className="text-sm transform -rotate-45 translate-x-0.5 translate-y-0.5" />
+              </button>
+            )}
+            {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
           </div>
           
           <div className="flex flex-wrap gap-2 mt-2">
@@ -92,11 +116,10 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
           </div>
         </div>
 
-        {/* ▼▼▼ 新增：導遊小知識區塊 (獨立點擊事件) ▼▼▼ */}
         {hasFact && (
           <div 
             onClick={(e) => {
-              e.stopPropagation(); // 阻止事件冒泡，避免觸發編輯 Modal
+              e.stopPropagation();
               onFactClick(item);
             }}
             className="bg-[#FFF8E1] border-t-2 border-dashed border-[#F2F4E7] p-3 flex items-start space-x-2 hover:bg-[#FFF3E0] transition-colors"
@@ -114,7 +137,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
              </div>
           </div>
         )}
-        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
       </div>
     </div>
   );
