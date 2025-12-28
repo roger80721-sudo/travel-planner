@@ -1,8 +1,8 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faCloudSun 
-} from '@fortawesome/free-solid-svg-icons'; // 修正：移除了沒用到的 faPlane
+  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll
+} from '@fortawesome/free-solid-svg-icons';
 
 export interface ScheduleItem {
   id: string;
@@ -12,6 +12,9 @@ export interface ScheduleItem {
   duration?: string;
   location?: string;
   weather?: string;
+  // ▼▼▼ 新增：導遊小故事欄位 ▼▼▼
+  factSummary?: string; // 卡片上顯示的簡述
+  factDetails?: string; // 點進去看的詳細故事
 }
 
 const TYPE_CONFIG = {
@@ -25,20 +28,21 @@ const TYPE_CONFIG = {
 interface TimelineItemProps {
   item: ScheduleItem;
   isLast: boolean;
-  onClick: (item: ScheduleItem) => void;
+  onEditClick: (item: ScheduleItem) => void; // 改名以區分
+  onFactClick: (item: ScheduleItem) => void; // 新增：點擊小知識的回呼
 }
 
-export const TimelineItem = ({ item, isLast, onClick }: TimelineItemProps) => {
+export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: TimelineItemProps) => {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.activity;
+  // 只有活動類且有填寫簡述時才顯示
+  const hasFact = item.type === 'activity' && item.factSummary;
 
   return (
     <div className="flex group relative pl-2">
-      {/* 左側時間軸線 (虛線) */}
       {!isLast && (
         <div className="absolute left-[27px] top-10 bottom-0 w-0.5 border-l-2 border-dashed border-[#d1cfc7]" />
       )}
 
-      {/* 左側時間與圖示 */}
       <div className="flex flex-col items-center mr-4 relative z-10">
         <div className="text-[10px] font-black text-[#796C53] mb-1 font-mono">{item.time}</div>
         <div className={`
@@ -49,19 +53,19 @@ export const TimelineItem = ({ item, isLast, onClick }: TimelineItemProps) => {
         </div>
       </div>
 
-      {/* 右側卡片 (DIY 方程式卡片風格) */}
+      {/* 卡片本體 (點擊觸發編輯) */}
       <div 
-        onClick={() => onClick(item)}
+        onClick={() => onEditClick(item)}
         className={`
           flex-1 mb-6 relative cursor-pointer transition-transform active:scale-95
           bg-[#FFFAFA] rounded-[24px] border-2 border-white
           shadow-[4px_4px_0px_0px_rgba(121,108,83,0.1)] hover:shadow-[4px_4px_0px_0px_rgba(121,108,83,0.2)]
+          overflow-hidden
         `}
       >
-        {/* 卡片裝飾：左上角的彩色膠帶效果 */}
         <div className={`absolute -top-2 left-6 w-8 h-3 ${config.bg} opacity-50 rotate-[-5deg]`} />
 
-        <div className="p-4">
+        <div className="p-4 pb-3">
           <div className="flex justify-between items-start">
             <h3 className="text-lg font-black text-[#5E5340] leading-tight mb-1">{item.title}</h3>
           </div>
@@ -87,6 +91,30 @@ export const TimelineItem = ({ item, isLast, onClick }: TimelineItemProps) => {
             )}
           </div>
         </div>
+
+        {/* ▼▼▼ 新增：導遊小知識區塊 (獨立點擊事件) ▼▼▼ */}
+        {hasFact && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation(); // 阻止事件冒泡，避免觸發編輯 Modal
+              onFactClick(item);
+            }}
+            className="bg-[#FFF8E1] border-t-2 border-dashed border-[#F2F4E7] p-3 flex items-start space-x-2 hover:bg-[#FFF3E0] transition-colors"
+          >
+             <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 mt-0.5" />
+             <div className="flex-1">
+               <p className="text-xs font-bold text-[#796C53] line-clamp-2">
+                 <span className="text-orange-500 mr-1">冷知識｜</span>
+                 {item.factSummary}
+               </p>
+               <div className="text-[10px] text-orange-400 font-bold mt-1 flex items-center justify-end">
+                 <FontAwesomeIcon icon={faScroll} className="mr-1" />
+                 點擊看故事
+               </div>
+             </div>
+          </div>
+        )}
+        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
       </div>
     </div>
   );

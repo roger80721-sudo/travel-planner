@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：移除了沒用到的 faCloudArrowUp ▼▼▼
-import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
+// ▼▼▼ 修正：補上了 faLightbulb ▼▼▼
+import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowDown, faBookOpen, faLightbulb } from '@fortawesome/free-solid-svg-icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 import { DateSelector } from './components/DateSelector';
@@ -23,7 +23,11 @@ const INITIAL_DATA: ScheduleDay[] = [
     date: '2025-02-27',
     dayOfWeek: '1',
     items: [
-      { id: '1', time: '10:00', type: 'transport', title: '抵達關西機場', duration: '1h', location: '關西國際機場', weather: 'sunny' },
+      { 
+        id: '1', time: '10:00', type: 'activity', title: '清水寺', duration: '2h', location: '京都', weather: 'sunny',
+        factSummary: '你知道這裡的舞台沒用一根釘子嗎？',
+        factDetails: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子，採用的是日本傳統的「懸造法」建築工藝。這句「從清水舞台跳下去」（清水の舞台から飛び降りる）的日本諺語，就是形容抱著必死的決心去做某件事喔！'
+      },
     ] as ScheduleItem[]
   }
 ];
@@ -39,6 +43,9 @@ export const SchedulePage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDateManageOpen, setIsDateManageOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
+
+  const [isFactModalOpen, setIsFactModalOpen] = useState(false);
+  const [viewingFactItem, setViewingFactItem] = useState<ScheduleItem | null>(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -85,6 +92,7 @@ export const SchedulePage = () => {
 
   const openAddModal = () => { setEditingItem(null); setIsModalOpen(true); };
   const openEditModal = (item: ScheduleItem) => { setEditingItem(item); setIsModalOpen(true); };
+  const openFactModal = (item: ScheduleItem) => { setViewingFactItem(item); setIsFactModalOpen(true); };
 
   const handleSaveItem = (formData: Omit<ScheduleItem, 'id'>) => {
     const newSchedules = schedules.map(day => {
@@ -236,7 +244,8 @@ export const SchedulePage = () => {
                           <TimelineItem 
                             item={item} 
                             isLast={index === currentItems.length - 1} 
-                            onClick={openEditModal} 
+                            onEditClick={openEditModal} 
+                            onFactClick={openFactModal}
                           />
                         </div>
                       )}
@@ -270,6 +279,39 @@ export const SchedulePage = () => {
 
       <Modal isOpen={isDateManageOpen} onClose={() => setIsDateManageOpen(false)} title="調整旅程日期">
         <ManageDatesForm schedules={schedules} onSave={handleSaveDates} onCancel={() => setIsDateManageOpen(false)} />
+      </Modal>
+
+      <Modal 
+        isOpen={isFactModalOpen} 
+        onClose={() => setIsFactModalOpen(false)} 
+        title={viewingFactItem?.title || "景點小故事"}
+      >
+        <div className="space-y-4">
+          <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 flex items-start space-x-3">
+            <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 text-xl mt-1" />
+            <div>
+              <h4 className="font-black text-yellow-700 mb-1">冷知識簡述</h4>
+              <p className="text-sm font-bold text-[#796C53]">{viewingFactItem?.factSummary}</p>
+            </div>
+          </div>
+
+          <div className="nook-card p-5 bg-[#FFF8E1]">
+            <h4 className="font-black text-[#5E5340] mb-3 flex items-center text-lg">
+              <FontAwesomeIcon icon={faBookOpen} className="mr-2 text-orange-400" />
+              詳細故事
+            </h4>
+            <div className="text-[#796C53] font-bold leading-relaxed whitespace-pre-wrap">
+              {viewingFactItem?.factDetails || "（目前還沒有詳細故事喔）"}
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setIsFactModalOpen(false)}
+            className="w-full py-3 rounded-xl font-bold text-white bg-[#5C4033] shadow-lg hover:bg-[#4a332a] transition-colors"
+          >
+            我知道了！
+          </button>
+        </div>
       </Modal>
     </div>
   );
