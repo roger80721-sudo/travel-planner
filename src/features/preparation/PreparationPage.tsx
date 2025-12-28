@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：移除了沒用到的 faMagnifyingGlassDollar ▼▼▼
 import { 
   faPlus, faTrashCan, faCheck, faCloudArrowDown, 
   faPalette, faUserGroup, faPen, faSuitcase, faBagShopping, 
-  faLanguage, faSpinner
+  faMagnifyingGlassDollar // ✨ 加回這個漂亮的查價圖示
 } from '@fortawesome/free-solid-svg-icons';
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
@@ -14,7 +13,7 @@ interface CheckItem {
   id: string;
   text: string;
   checkedBy: string[];
-  owner?: string;
+  owner?: string; // 物品的主人
 }
 
 interface Category {
@@ -59,8 +58,6 @@ export const PreparationPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentMember, setCurrentMember] = useState<string>('我');
   const [viewMode, setViewMode] = useState<'individual' | 'summary'>('individual');
-  
-  const [translatingItem, setTranslatingItem] = useState<string | null>(null);
 
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -181,6 +178,7 @@ export const PreparationPage = () => {
                 id: Date.now().toString(), 
                 text, 
                 checkedBy: [],
+                // 關鍵：購物模式下，標記此物品屬於當前成員
                 owner: activeTab === 'shopping' ? currentMember : undefined 
               }] 
             };
@@ -203,30 +201,15 @@ export const PreparationPage = () => {
     saveCurrentData(newCategories);
   };
 
-  const handlePriceCheck = async (itemId: string, itemName: string) => {
-    setTranslatingItem(itemId);
-    
-    try {
-      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(itemName)}&langpair=zh-TW|ja`);
-      const data = await res.json();
-      
-      let searchTerm = itemName;
-      if (data.responseData && data.responseData.translatedText) {
-        searchTerm = data.responseData.translatedText;
-        console.log(`翻譯成功: ${itemName} -> ${searchTerm}`);
-      }
-
-      const url = `https://kakaku.com/search_results/${encodeURIComponent(searchTerm)}`;
-      window.open(url, '_blank');
-
-    } catch (error) {
-      console.error('翻譯失敗，使用原文搜尋', error);
-      const url = `https://kakaku.com/search_results/${encodeURIComponent(itemName)}`;
-      window.open(url, '_blank');
-    } finally {
-      setTranslatingItem(null);
-    }
+  // ▼▼▼ 修正後的智慧查價功能 ▼▼▼
+  const handlePriceCheck = (itemName: string) => {
+    // 改用 Google 搜尋，關鍵字：「商品名 + 日本 + 価格」
+    // Google 會自動辨識「合利他命」並搜尋「アリナミン」相關的日本網站 (Kakaku/Amazon/松本清)
+    const query = `${itemName} 日本 価格`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    window.open(url, '_blank');
   };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const calculateProgress = (member: string) => {
     let myItems = 0;
@@ -235,11 +218,13 @@ export const PreparationPage = () => {
     currentCategories.forEach(cat => {
       cat.items.forEach(item => {
         if (activeTab === 'shopping') {
+          // 購物清單：只計算屬於該成員的
           if (item.owner === member) {
             myItems++;
             if (item.checkedBy.includes(member)) myChecked++;
           }
         } else {
+          // 行李清單：全體共用
           myItems++;
           if (item.checkedBy.includes(member)) myChecked++;
         }
@@ -274,6 +259,7 @@ export const PreparationPage = () => {
 
   return (
     <div className="pb-24 px-4 pt-4">
+      {/* 頂部切換 Tab */}
       <div className="bg-[#F2F4E7] p-1 rounded-2xl flex space-x-1 mb-4 border-2 border-[#E5E7EB]">
         <button 
           onClick={() => setActiveTab('packing')}
@@ -370,6 +356,7 @@ export const PreparationPage = () => {
 
           <div className="space-y-6">
             {currentCategories.map(cat => {
+              // ▼▼▼ 過濾邏輯：購物清單只顯示自己的物品 ▼▼▼
               const visibleItems = activeTab === 'shopping' 
                 ? cat.items.filter(item => item.owner === currentMember)
                 : cat.items;
@@ -408,18 +395,14 @@ export const PreparationPage = () => {
                               {item.text}
                             </span>
 
+                            {/* ▼▼▼ 自動查價按鈕 (Google 搜尋) ▼▼▼ */}
                             {activeTab === 'shopping' && (
                                <button 
-                                 onClick={() => handlePriceCheck(item.id, item.text)}
-                                 disabled={translatingItem === item.id}
-                                 className="text-orange-400 bg-orange-50 px-2 py-1 rounded-lg text-[10px] font-bold mr-2 hover:bg-orange-100 transition-colors flex items-center"
-                                 title="翻譯成日文並查價"
+                                 onClick={() => handlePriceCheck(item.text)}
+                                 className="text-orange-400 bg-orange-50 px-2 py-1 rounded-lg text-[10px] font-bold mr-2 hover:bg-orange-100 transition-colors flex items-center whitespace-nowrap"
+                                 title="Google 智慧比價"
                                >
-                                 {translatingItem === item.id ? (
-                                   <FontAwesomeIcon icon={faSpinner} spin className="mr-1" />
-                                 ) : (
-                                   <FontAwesomeIcon icon={faLanguage} className="mr-1" />
-                                 )}
+                                 <FontAwesomeIcon icon={faMagnifyingGlassDollar} className="mr-1" />
                                  查價
                                </button>
                             )}
