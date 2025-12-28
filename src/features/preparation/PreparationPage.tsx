@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faTrashCan, faCheck, faCloudArrowDown, 
-  faPalette, faUserGroup, faPen 
+  faPalette, faUserGroup, faPen, faSuitcase, faBagShopping, faMagnifyingGlassDollar 
 } from '@fortawesome/free-solid-svg-icons';
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
+// 資料結構
 interface CheckItem {
   id: string;
   text: string;
-  checkedBy: string[];
+  checkedBy: string[]; // 記錄誰完成了(或誰買了)
 }
 
 interface Category {
@@ -25,7 +26,8 @@ const COLOR_PALETTE = [
   '#BCAAA4', '#F48FB1', '#9575CD', '#4DB6AC'
 ];
 
-const INITIAL_CATEGORIES: Category[] = [
+// 行李清單預設值
+const INITIAL_PACKING: Category[] = [
   {
     id: 'important', title: '🔴 重要證件', color: '#F48FB1', items: [
       { id: '1', text: '護照', checkedBy: [] },
@@ -34,21 +36,40 @@ const INITIAL_CATEGORIES: Category[] = [
   }
 ];
 
+// 購物清單預設值
+const INITIAL_SHOPPING: Category[] = [
+  {
+    id: 'drugstore', title: '💊 藥妝店', color: '#96E0C5', items: [
+      { id: 's1', text: 'EVE 止痛藥', checkedBy: [] },
+      { id: 's2', text: '合利他命 EX', checkedBy: [] },
+    ]
+  },
+  {
+    id: 'electronics', title: '📷 電器/3C', color: '#7CAFC4', items: []
+  }
+];
+
 export const PreparationPage = () => {
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  // ▼▼▼ 狀態管理 ▼▼▼
+  const [activeTab, setActiveTab] = useState<'packing' | 'shopping'>('packing'); // 切換分頁
+  
+  const [packingCats, setPackingCats] = useState<Category[]>(INITIAL_PACKING);
+  const [shoppingCats, setShoppingCats] = useState<Category[]>(INITIAL_SHOPPING);
+  
   const [members, setMembers] = useState<string[]>(['我']);
-  // 新增：成員顏色
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentMember, setCurrentMember] = useState<string>('我');
   const [viewMode, setViewMode] = useState<'individual' | 'summary'>('individual');
 
+  // Modal 狀態
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [formCatTitle, setFormCatTitle] = useState('');
   const [formCatColor, setFormCatColor] = useState(COLOR_PALETTE[0]);
 
+  // ▼▼▼ 初始化：載入所有資料 ▼▼▼
   useEffect(() => {
     const initData = async () => {
       setIsLoading(true);
@@ -59,38 +80,53 @@ export const PreparationPage = () => {
         setCurrentMember(cloudMembers[0]);
       }
 
-      // 新增：載入成員顏色
       const cloudColors = await loadFromCloud('travel-member-colors');
-      if (cloudColors) {
-        setMemberColors(cloudColors);
-      }
+      if (cloudColors) setMemberColors(cloudColors);
 
-      const cloudData = await loadFromCloud('travel-preparation-data');
-      if (cloudData) {
-        const migratedData = cloudData.map((cat: any) => ({
-          ...cat,
-          color: cat.color || '#F3A76C',
-          items: cat.items.map((item: any) => ({
-            ...item,
-            checkedBy: item.checkedBy || (item.checked ? [cloudMembers?.[0] || '我'] : [])
-          }))
-        }));
-        setCategories(migratedData);
-      }
+      // 載入行李清單
+      const cloudPacking = await loadFromCloud('travel-preparation-data');
+      if (cloudPacking) setPackingCats(migrateData(cloudPacking, cloudMembers));
+
+      // 載入購物清單
+      const cloudShopping = await loadFromCloud('travel-shopping-data');
+      if (cloudShopping) setShoppingCats(migrateData(cloudShopping, cloudMembers));
+
       setIsLoading(false);
     };
     initData();
   }, []);
 
-  const saveAllToCloud = (newData: Category[]) => {
-    setCategories(newData);
-    saveToCloud('travel-preparation-data', newData);
+  // 資料遷移輔助函式 (避免舊資料缺欄位報錯)
+  const migrateData = (data: any[], currentMembers: string[]) => {
+    return data.map((cat: any) => ({
+      ...cat,
+      color: cat.color || '#F3A76C',
+      items: cat.items.map((item: any) => ({
+        ...item,
+        checkedBy: item.checkedBy || (item.checked ? [currentMembers?.[0] || '我'] : [])
+      }))
+    }));
   };
 
+  // ▼▼▼ 儲存邏輯 ▼▼▼
+  // 根據目前的分頁，儲存到不同的雲端 key
+  const saveCurrentData = (newData: Category[]) => {
+    if (activeTab === 'packing') {
+      setPackingCats(newData);
+      saveToCloud('travel-preparation-data', newData);
+    } else {
+      setShoppingCats(newData);
+      saveToCloud('travel-shopping-data', newData);
+    }
+  };
+
+  const currentCategories = activeTab === 'packing' ? packingCats : shoppingCats;
+
+  // ▼▼▼ 操作邏輯 (通用) ▼▼▼
   const toggleCheck = (catId: string, itemId: string) => {
     if (viewMode === 'summary') return;
 
-    const newCategories = categories.map(cat => {
+    const newCategories = currentCategories.map(cat => {
       if (cat.id === catId) {
         return {
           ...cat,
@@ -111,7 +147,7 @@ export const PreparationPage = () => {
       }
       return cat;
     });
-    saveAllToCloud(newCategories);
+    saveCurrentData(newCategories);
   };
 
   const handleSaveCategory = () => {
@@ -119,39 +155,25 @@ export const PreparationPage = () => {
 
     let newCategories;
     if (editingCat) {
-      newCategories = categories.map(c => 
+      newCategories = currentCategories.map(c => 
         c.id === editingCat.id ? { ...c, title: formCatTitle, color: formCatColor } : c
       );
     } else {
-      newCategories = [...categories, { 
+      newCategories = [...currentCategories, { 
         id: Date.now().toString(), 
         title: formCatTitle, 
         color: formCatColor, 
         items: [] 
       }];
     }
-    saveAllToCloud(newCategories);
+    saveCurrentData(newCategories);
     setIsCatModalOpen(false);
-  };
-
-  const openAddCatModal = () => {
-    setEditingCat(null);
-    setFormCatTitle('');
-    setFormCatColor(COLOR_PALETTE[0]);
-    setIsCatModalOpen(true);
-  };
-
-  const openEditCatModal = (cat: Category) => {
-    setEditingCat(cat);
-    setFormCatTitle(cat.title);
-    setFormCatColor(cat.color);
-    setIsCatModalOpen(true);
   };
 
   const deleteCategory = (id: string) => {
     if (confirm('確定要刪除整個分類嗎？')) {
-      const newCategories = categories.filter(c => c.id !== id);
-      saveAllToCloud(newCategories);
+      const newCategories = currentCategories.filter(c => c.id !== id);
+      saveCurrentData(newCategories);
     }
   };
 
@@ -159,7 +181,7 @@ export const PreparationPage = () => {
     if (e.key === 'Enter') {
       const text = e.currentTarget.value.trim();
       if (text) {
-        const newCategories = categories.map(c => {
+        const newCategories = currentCategories.map(c => {
           if (c.id === catId) {
             return { 
               ...c, 
@@ -168,41 +190,83 @@ export const PreparationPage = () => {
           }
           return c;
         });
-        saveAllToCloud(newCategories);
+        saveCurrentData(newCategories);
         e.currentTarget.value = '';
       }
     }
   };
 
   const deleteItem = (catId: string, itemId: string) => {
-    const newCategories = categories.map(cat => {
+    const newCategories = currentCategories.map(cat => {
       if (cat.id === catId) {
         return { ...cat, items: cat.items.filter(i => i.id !== itemId) };
       }
       return cat;
     });
-    saveAllToCloud(newCategories);
+    saveCurrentData(newCategories);
+  };
+
+  // ▼▼▼ 自動查價功能 (購物清單專用) ▼▼▼
+  const handlePriceCheck = (itemName: string) => {
+    // 使用 Kakaku.com (日本最大比價網) 搜尋
+    const url = `https://kakaku.com/search_results/${encodeURIComponent(itemName)}`;
+    window.open(url, '_blank');
   };
 
   const calculateProgress = (member: string) => {
-    const total = categories.reduce((sum, cat) => sum + cat.items.length, 0);
+    const total = currentCategories.reduce((sum, cat) => sum + cat.items.length, 0);
     if (total === 0) return 0;
-    const checked = categories.reduce((sum, cat) => 
+    const checked = currentCategories.reduce((sum, cat) => 
       sum + cat.items.filter(i => i.checkedBy.includes(member)).length, 0);
     return Math.round((checked / total) * 100);
+  };
+
+  // 開啟 Modal 輔助
+  const openAddCatModal = () => {
+    setEditingCat(null);
+    setFormCatTitle('');
+    setFormCatColor(COLOR_PALETTE[0]);
+    setIsCatModalOpen(true);
+  };
+  const openEditCatModal = (cat: Category) => {
+    setEditingCat(cat);
+    setFormCatTitle(cat.title);
+    setFormCatColor(cat.color);
+    setIsCatModalOpen(true);
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-[#8DD2BA]">
         <FontAwesomeIcon icon={faCloudArrowDown} className="text-4xl animate-bounce mb-2" />
-        <p className="font-bold">正在同步大家的行李清單...</p>
+        <p className="font-bold">正在整理清單...</p>
       </div>
     );
   }
 
   return (
     <div className="pb-24 px-4 pt-4">
+      {/* 頂部切換 Tab */}
+      <div className="bg-[#F2F4E7] p-1 rounded-2xl flex space-x-1 mb-4 border-2 border-[#E5E7EB]">
+        <button 
+          onClick={() => setActiveTab('packing')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all
+            ${activeTab === 'packing' ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+        >
+          <FontAwesomeIcon icon={faSuitcase} />
+          <span>行李準備</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('shopping')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all
+            ${activeTab === 'shopping' ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400 hover:text-gray-500'}`}
+        >
+          <FontAwesomeIcon icon={faBagShopping} />
+          <span>待買清單</span>
+        </button>
+      </div>
+
+      {/* 成員切換列 */}
       <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar pb-2">
         <button
           onClick={() => setViewMode('summary')}
@@ -224,12 +288,10 @@ export const PreparationPage = () => {
                 ? 'bg-white text-[#5C4033] border-[#5C4033] shadow-md' 
                 : 'bg-white text-gray-400 border-transparent'}`}
           >
-            {/* ▼▼▼ 修改：顯示成員代表色 ▼▼▼ */}
             <span 
               className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border border-gray-100"
               style={{ backgroundColor: memberColors[m] || '#eee' }}
             />
-            {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
             {m}
           </button>
         ))}
@@ -237,14 +299,15 @@ export const PreparationPage = () => {
 
       {viewMode === 'summary' && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#F2F4E7] mb-6 space-y-4">
-          <h2 className="font-black text-[#5E5340] mb-2 text-center">📊 大家收好了嗎？</h2>
+          <h2 className="font-black text-[#5E5340] mb-2 text-center">
+            {activeTab === 'packing' ? '📊 行李準備進度' : '📊 採購完成度'}
+          </h2>
           {members.map(m => {
             const prog = calculateProgress(m);
             return (
               <div key={m} className="space-y-1">
                 <div className="flex justify-between text-xs font-bold text-gray-600">
                   <span className="flex items-center">
-                    {/* 總覽也加上顏色點點 */}
                     <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: memberColors[m] || '#ccc' }}></span>
                     {m}
                   </span>
@@ -267,7 +330,7 @@ export const PreparationPage = () => {
           <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#F2F4E7] mb-6">
              <div className="flex justify-between items-end mb-2">
                 <h2 className="font-black text-[#5E5340] text-lg">
-                  {currentMember} 的行李
+                  {currentMember} 的{activeTab === 'packing' ? '行李' : '清單'}
                 </h2>
                 <span className="text-[#3AA986] font-black font-mono text-2xl">{calculateProgress(currentMember)}%</span>
              </div>
@@ -280,7 +343,7 @@ export const PreparationPage = () => {
           </div>
 
           <div className="space-y-6">
-            {categories.map(cat => (
+            {currentCategories.map(cat => (
               <div key={cat.id} className="nook-card overflow-hidden">
                 <div 
                   className="p-3 flex justify-between items-center text-white"
@@ -314,6 +377,19 @@ export const PreparationPage = () => {
                             {item.text}
                           </span>
 
+                          {/* ▼▼▼ 自動查價按鈕 (僅在購物模式顯示) ▼▼▼ */}
+                          {activeTab === 'shopping' && (
+                             <button 
+                               onClick={() => handlePriceCheck(item.text)}
+                               className="text-orange-400 bg-orange-50 px-2 py-1 rounded-lg text-[10px] font-bold mr-2 hover:bg-orange-100 transition-colors flex items-center"
+                               title="去 Kakaku.com 查價"
+                             >
+                               <FontAwesomeIcon icon={faMagnifyingGlassDollar} className="mr-1" />
+                               查價
+                             </button>
+                          )}
+                          {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+
                           <button onClick={() => deleteItem(cat.id, item.id)} className="text-gray-200 hover:text-red-300 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <FontAwesomeIcon icon={faTrashCan} className="text-xs" />
                           </button>
@@ -325,7 +401,7 @@ export const PreparationPage = () => {
                       <div className="w-6 h-6 mr-3 flex items-center justify-center text-gray-300"><FontAwesomeIcon icon={faPlus} className="text-xs" /></div>
                       <input 
                         type="text" 
-                        placeholder="新增項目..."
+                        placeholder={activeTab === 'packing' ? "新增行李項目..." : "想買什麼..."}
                         className="flex-1 bg-transparent outline-none text-sm font-bold text-[#5E5340] placeholder-gray-300"
                         onKeyDown={(e) => handleAddItemKeyDown(e, cat.id)}
                       />
@@ -350,7 +426,7 @@ export const PreparationPage = () => {
                type="text" 
                value={formCatTitle} 
                onChange={e => setFormCatTitle(e.target.value)} 
-               placeholder="例如：3C 用品" 
+               placeholder={activeTab === 'packing' ? "例如：3C 用品" : "例如：藥妝店"}
                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2 font-bold outline-none focus:border-orange-200"
                autoFocus
              />
