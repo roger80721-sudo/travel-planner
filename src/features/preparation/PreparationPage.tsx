@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrashCan, faCheck, faRotateLeft, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
 import { Modal } from '../../components/ui/Modal';
-import { loadFromCloud, saveToCloud } from '../../utils/supabase'; // 引入雲端工具
+import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
 interface CheckItem {
   id: string;
@@ -34,16 +34,12 @@ const INITIAL_CATEGORIES: Category[] = [
 
 export const PreparationPage = () => {
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
-  const [isLoading, setIsLoading] = useState(true); // 讀取狀態
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   
-  // 新增項目暫存
-  const [newItemText, setNewItemText] = useState('');
-  const [targetCatId, setTargetCatId] = useState('');
-
-  // ▼▼▼ 1. 初始化：從雲端載入 ▼▼▼
+  // 1. 初始化：從雲端載入
   useEffect(() => {
     const initData = async () => {
       setIsLoading(true);
@@ -56,7 +52,7 @@ export const PreparationPage = () => {
     initData();
   }, []);
 
-  // ▼▼▼ 2. 儲存輔助函式 ▼▼▼
+  // 2. 儲存輔助函式
   const saveAllToCloud = (newData: Category[]) => {
     setCategories(newData);
     saveToCloud('travel-preparation-data', newData);
@@ -73,14 +69,14 @@ export const PreparationPage = () => {
       }
       return cat;
     });
-    saveAllToCloud(newCategories); // 存到雲端
+    saveAllToCloud(newCategories);
   };
 
   // 新增分類
   const addCategory = () => {
     if (!newCatName.trim()) return;
     const newCategories = [...categories, { id: Date.now().toString(), title: newCatName, items: [] }];
-    saveAllToCloud(newCategories); // 存到雲端
+    saveAllToCloud(newCategories);
     setNewCatName('');
     setIsModalOpen(false);
   };
@@ -89,25 +85,8 @@ export const PreparationPage = () => {
   const deleteCategory = (id: string) => {
     if (confirm('確定要刪除整個分類嗎？')) {
       const newCategories = categories.filter(c => c.id !== id);
-      saveAllToCloud(newCategories); // 存到雲端
+      saveAllToCloud(newCategories);
     }
-  };
-
-  // 新增項目
-  const addItem = () => {
-    if (!newItemText.trim() || !targetCatId) return;
-    const newCategories = categories.map(cat => {
-      if (cat.id === targetCatId) {
-        return {
-          ...cat,
-          items: [...cat.items, { id: Date.now().toString(), text: newItemText, checked: false }]
-        };
-      }
-      return cat;
-    });
-    saveAllToCloud(newCategories); // 存到雲端
-    setNewItemText('');
-    setTargetCatId('');
   };
 
   // 刪除項目
@@ -118,7 +97,7 @@ export const PreparationPage = () => {
       }
       return cat;
     });
-    saveAllToCloud(newCategories); // 存到雲端
+    saveAllToCloud(newCategories);
   };
 
   // 重置該分類所有勾選
@@ -130,10 +109,9 @@ export const PreparationPage = () => {
       }
       return cat;
     });
-    saveAllToCloud(newCategories); // 存到雲端
+    saveAllToCloud(newCategories);
   };
 
-  // 計算進度
   const totalItems = categories.reduce((sum, cat) => sum + cat.items.length, 0);
   const checkedItems = categories.reduce((sum, cat) => sum + cat.items.filter(i => i.checked).length, 0);
   const progress = totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
@@ -199,9 +177,6 @@ export const PreparationPage = () => {
                     className="flex-1 bg-transparent outline-none text-sm font-bold text-[#5E5340] placeholder-gray-300"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        setTargetCatId(cat.id);
-                        setNewItemText(e.currentTarget.value);
-                        // 因為 setState 是非同步，這裡我們直接用 local 變數呼叫
                         const text = e.currentTarget.value;
                         if(text.trim()) {
                           const newCategories = categories.map(c => {
