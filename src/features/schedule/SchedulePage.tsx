@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faPen, faClock, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'; // 引入拖拉套件
+import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowUp, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 import { DateSelector } from './components/DateSelector';
 import { TimelineItem, type ScheduleItem } from './components/TimelineItem';
 import { Modal } from '../../components/ui/Modal';
 import { AddScheduleForm } from './components/AddScheduleForm';
 import { ManageDatesForm } from './components/ManageDatesForm';
-import { calculateNewTime } from '../../utils/timeUtils'; // 引入時間計算工具
+import { calculateNewTime } from '../../utils/timeUtils';
+import { loadFromCloud, saveToCloud } from '../../utils/supabase'; // 引入雲端工具
 
 export interface ScheduleDay {
   date: string;
@@ -22,45 +23,67 @@ const INITIAL_DATA: ScheduleDay[] = [
     dayOfWeek: '1',
     items: [
       { id: '1', time: '10:00', type: 'transport', title: '抵達關西機場', duration: '1h', location: '關西國際機場', weather: 'sunny' },
-      { id: '2', time: '12:00', type: 'food', title: '臨空城午餐', duration: '1.5h', location: 'Rinku Town', weather: 'sunny' },
     ] as ScheduleItem[]
-  },
-  {
-    date: '2025-02-28',
-    dayOfWeek: '2',
-    items: [] as ScheduleItem[]
   }
 ];
 
 export const SchedulePage = () => {
-  const [schedules, setSchedules] = useState<ScheduleDay[]>(() => {
-    const saved = localStorage.getItem('travel-planner-data');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return INITIAL_DATA; }
-    }
-    return INITIAL_DATA;
-  });
+  // 1. 行程資料
+  const [schedules, setSchedules] = useState<ScheduleDay[]>(INITIAL_DATA);
+  const [isLoading, setIsLoading] = useState(true); // 載入中狀態
 
-  const [tripTitle, setTripTitle] = useState(() => localStorage.getItem('travel-trip-title') || '我的日本之旅 🇯🇵');
+  // 2. 旅程標題
+  const [tripTitle, setTripTitle] = useState('我的日本之旅 🇯🇵');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(INITIAL_DATA[0].date);
-  
+
+  const [selectedDate, setSelectedDate] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDateManageOpen, setIsDateManageOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
 
-  useEffect(() => { localStorage.setItem('travel-planner-data', JSON.stringify(schedules)); }, [schedules]);
-  useEffect(() => { localStorage.setItem('travel-trip-title', tripTitle); }, [tripTitle]);
-
+  // ▼▼▼ 初始化：從雲端載入資料 ▼▼▼
   useEffect(() => {
-    if (schedules.length > 0 && !schedules.find(d => d.date === selectedDate)) {
-      setSelectedDate(schedules[0].date);
+    const initData = async () => {
+      setIsLoading(true);
+      
+      // 載入行程
+      const cloudSchedules = await loadFromCloud('travel-planner-data');
+      if (cloudSchedules) setSchedules(cloudSchedules);
+      
+      // 載入標題
+      const cloudTitle = await loadFromCloud('travel-trip-title');
+      if (cloudTitle) setTripTitle(cloudTitle);
+
+      setIsLoading(false);
+    };
+    initData();
+  }, []);
+
+  // 設定預設選取日期 (當資料載入完成後)
+  useEffect(() => {
+    if (!isLoading && schedules.length > 0) {
+      // 如果目前選的日期不在列表內，就選第一天
+      const exists = schedules.find(d => d.date === selectedDate);
+      if (!exists) {
+        setSelectedDate(schedules[0].date);
+      }
     }
-  }, [schedules, selectedDate]);
+  }, [schedules, isLoading, selectedDate]);
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // ▼▼▼ 儲存：當資料變動時，存到雲端 ▼▼▼
+  // 為了避免打字時一直存，這裡我們不做 useEffect 自動存，
+  // 而是改成「操作後手動呼叫儲存」或者「Debounce (防抖)」，
+  // 但為了教學簡單，我們直接在修改資料的 function 裡呼叫 saveToCloud。
+  
+  const saveAllToCloud = (newSchedules: ScheduleDay[], newTitle?: string) => {
+    saveToCloud('travel-planner-data', newSchedules);
+    if (newTitle) saveToCloud('travel-trip-title', newTitle);
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const currentDayIndex = schedules.findIndex(d => d.date === selectedDate);
-  const currentDay = schedules[currentDayIndex];
-  const currentItems = currentDay ? currentDay.items : [];
+  const currentItems = schedules[currentDayIndex]?.items || [];
 
   const getCountdown = () => {
     if (schedules.length === 0) return 0;
@@ -77,80 +100,84 @@ export const SchedulePage = () => {
   const openEditModal = (item: ScheduleItem) => { setEditingItem(item); setIsModalOpen(true); };
 
   const handleSaveItem = (formData: Omit<ScheduleItem, 'id'>) => {
-    setSchedules(prev => {
-      const newSchedules = [...prev];
-      const day = newSchedules[currentDayIndex];
-      
-      let newItems;
-      if (editingItem) {
-        newItems = day.items.map(item => item.id === editingItem.id ? { ...item, ...formData } : item);
-      } else {
-        newItems = [...day.items, { ...formData, id: Date.now().toString() }];
+    const newSchedules = schedules.map(day => {
+      if (day.date === selectedDate) {
+        let newItems;
+        if (editingItem) {
+          newItems = day.items.map(item => item.id === editingItem.id ? { ...item, ...formData } : item);
+        } else {
+          newItems = [...day.items, { ...formData, id: Date.now().toString() }];
+        }
+        return { ...day, items: newItems.sort((a, b) => a.time.localeCompare(b.time)) };
       }
-      
-      // 儲存時也自動排序
-      newSchedules[currentDayIndex] = { ...day, items: newItems.sort((a, b) => a.time.localeCompare(b.time)) };
-      return newSchedules;
+      return day;
     });
+    
+    setSchedules(newSchedules);
+    saveAllToCloud(newSchedules); // 儲存到雲端
     setIsModalOpen(false);
   };
 
   const handleDeleteItem = () => {
     if (!editingItem) return;
     if (window.confirm(`確定要刪除「${editingItem.title}」嗎？`)) {
-      setSchedules(prev => {
-        const newSchedules = [...prev];
-        const day = newSchedules[currentDayIndex];
-        newSchedules[currentDayIndex] = { ...day, items: day.items.filter(item => item.id !== editingItem.id) };
-        return newSchedules;
+      const newSchedules = schedules.map(day => {
+        if (day.date === selectedDate) {
+          return { ...day, items: day.items.filter(item => item.id !== editingItem.id) };
+        }
+        return day;
       });
+      setSchedules(newSchedules);
+      saveAllToCloud(newSchedules); // 儲存到雲端
       setIsModalOpen(false);
     }
   };
 
   const handleSaveDates = (newSchedules: ScheduleDay[]) => {
     setSchedules(newSchedules);
+    saveAllToCloud(newSchedules); // 儲存到雲端
     setIsDateManageOpen(false);
   };
 
-  // ▼▼▼ 拖拉結束後的處理邏輯 (最關鍵的部分) ▼▼▼
   const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return; // 如果拖到外面去，不做事
-    
+    if (!result.destination) return;
     const sourceIndex = result.source.index;
     const destinationIndex = result.destination.index;
-    
-    if (sourceIndex === destinationIndex) return; // 如果位置沒變，不做事
+    if (sourceIndex === destinationIndex) return;
 
-    // 1. 複製目前的 items
     const newItems = Array.from(currentItems);
-    // 2. 拿出被拖曳的那個項目
     const [reorderedItem] = newItems.splice(sourceIndex, 1);
-    // 3. 插入到新位置
     newItems.splice(destinationIndex, 0, reorderedItem);
 
-    // 4. 自動計算新時間
-    // 取得新位置的前一個 item 時間 (如果有的話)
     const prevItem = destinationIndex > 0 ? newItems[destinationIndex - 1] : null;
-    // 取得新位置的後一個 item 時間 (如果有的話)
     const nextItem = destinationIndex < newItems.length - 1 ? newItems[destinationIndex + 1] : null;
-
-    const newTime = calculateNewTime(
-      prevItem ? prevItem.time : null,
-      nextItem ? nextItem.time : null
-    );
-
-    // 更新該項目的時間
+    const newTime = calculateNewTime(prevItem ? prevItem.time : null, nextItem ? nextItem.time : null);
     newItems[destinationIndex] = { ...reorderedItem, time: newTime };
 
-    // 5. 更新 State
-    setSchedules(prev => {
-      const newSchedules = [...prev];
-      newSchedules[currentDayIndex] = { ...newSchedules[currentDayIndex], items: newItems };
-      return newSchedules;
-    });
+    const newSchedules = [...schedules];
+    newSchedules[currentDayIndex] = { ...newSchedules[currentDayIndex], items: newItems };
+    
+    setSchedules(newSchedules);
+    saveAllToCloud(newSchedules); // 儲存到雲端
   };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // 修改標題並儲存
+  const handleTitleChange = (newTitle: string) => {
+    setTripTitle(newTitle);
+  };
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    saveAllToCloud(schedules, tripTitle); // 儲存標題
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-[#8DD2BA]">
+        <FontAwesomeIcon icon={faCloudArrowDown} className="text-4xl animate-bounce mb-2" />
+        <p className="font-bold">正在從雲端載入行程...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-full pb-24">
@@ -177,8 +204,8 @@ export const SchedulePage = () => {
               <input 
                 type="text" 
                 value={tripTitle}
-                onChange={(e) => setTripTitle(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                onBlur={handleTitleBlur}
                 autoFocus
                 className="w-full text-2xl font-black text-[#5C4033] bg-transparent border-b-2 border-orange-300 outline-none pb-1"
               />
@@ -202,7 +229,6 @@ export const SchedulePage = () => {
         onSelect={setSelectedDate}
       />
 
-      {/* ▼▼▼ 拖拉區域開始 ▼▼▼ */}
       <div className="mt-4 px-1">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="schedule-list">
@@ -218,7 +244,7 @@ export const SchedulePage = () => {
                           {...provided.dragHandleProps}
                           style={{ 
                             ...provided.draggableProps.style,
-                            opacity: snapshot.isDragging ? 0.8 : 1 // 拖拉時變半透明
+                            opacity: snapshot.isDragging ? 0.8 : 1
                           }}
                         >
                           <TimelineItem 
@@ -242,7 +268,6 @@ export const SchedulePage = () => {
           </Droppable>
         </DragDropContext>
       </div>
-      {/* ▲▲▲ 拖拉區域結束 ▲▲▲ */}
 
       <button onClick={openAddModal} className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-[#5C4033] text-white shadow-xl flex items-center justify-center text-2xl active:scale-90 transition-transform z-40 hover:bg-[#4a332a]">
         <FontAwesomeIcon icon={faPlus} />
