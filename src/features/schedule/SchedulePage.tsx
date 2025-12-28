@@ -17,6 +17,7 @@ export interface ScheduleDay {
   items: ScheduleItem[];
 }
 
+// 預設資料 (需更新欄位)
 const INITIAL_DATA: ScheduleDay[] = [
   {
     date: '2025-02-27',
@@ -24,8 +25,8 @@ const INITIAL_DATA: ScheduleDay[] = [
     items: [
       { 
         id: '1', time: '10:00', type: 'activity', title: '清水寺', duration: '2h', location: '京都', weather: 'sunny',
-        factSummary: '你知道這裡的舞台沒用一根釘子嗎？',
-        factDetails: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子，採用的是日本傳統的「懸造法」建築工藝。這句「從清水舞台跳下去」（清水の舞台から飛び降りる）的日本諺語，就是形容抱著必死的決心去做某件事喔！'
+        coldKnowledge: '你知道這裡的舞台沒用一根釘子嗎？', // 冷知識
+        historyDescription: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子，採用的是日本傳統的「懸造法」建築工藝。這句「從清水舞台跳下去」（清水の舞台から飛び降りる）的日本諺語，就是形容抱著必死的決心去做某件事喔！' // 歷史故事
       },
     ] as ScheduleItem[]
   }
@@ -51,7 +52,18 @@ export const SchedulePage = () => {
       setIsLoading(true);
       
       const cloudSchedules = await loadFromCloud('travel-planner-data');
-      if (cloudSchedules) setSchedules(cloudSchedules);
+      if (cloudSchedules) {
+        // 資料遷移 (相容舊版欄位)
+        const migrated = cloudSchedules.map((day: any) => ({
+          ...day,
+          items: day.items.map((item: any) => ({
+            ...item,
+            coldKnowledge: item.coldKnowledge || item.factSummary, // 相容舊版 factSummary
+            historyDescription: item.historyDescription || item.factDetails // 相容舊版 factDetails
+          }))
+        }));
+        setSchedules(migrated);
+      }
       
       const cloudTitle = await loadFromCloud('travel-trip-title');
       if (cloudTitle) setTripTitle(cloudTitle);
@@ -268,7 +280,6 @@ export const SchedulePage = () => {
       </button>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "編輯行程" : "新增行程"}>
-        {/* ▼▼▼ 修正：傳入 date 屬性 ▼▼▼ */}
         <AddScheduleForm 
           initialData={editingItem} 
           date={selectedDate}
@@ -285,26 +296,31 @@ export const SchedulePage = () => {
       <Modal 
         isOpen={isFactModalOpen} 
         onClose={() => setIsFactModalOpen(false)} 
-        title={viewingFactItem?.title || "景點小故事"}
+        title={viewingFactItem?.title || "景點導覽"}
       >
+        {/* ▼▼▼ 修改：顯示冷知識與歷史故事 ▼▼▼ */}
         <div className="space-y-4">
-          <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 flex items-start space-x-3">
-            <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 text-xl mt-1" />
-            <div>
-              <h4 className="font-black text-yellow-700 mb-1">冷知識簡述</h4>
-              <p className="text-sm font-bold text-[#796C53]">{viewingFactItem?.factSummary}</p>
+          {viewingFactItem?.coldKnowledge && (
+            <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 flex items-start space-x-3">
+              <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 text-xl mt-1" />
+              <div>
+                <h4 className="font-black text-yellow-700 mb-1">冷知識</h4>
+                <p className="text-sm font-bold text-[#796C53]">{viewingFactItem.coldKnowledge}</p>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="nook-card p-5 bg-[#FFF8E1]">
-            <h4 className="font-black text-[#5E5340] mb-3 flex items-center text-lg">
-              <FontAwesomeIcon icon={faBookOpen} className="mr-2 text-orange-400" />
-              詳細故事
-            </h4>
-            <div className="text-[#796C53] font-bold leading-relaxed whitespace-pre-wrap">
-              {viewingFactItem?.factDetails || "（目前還沒有詳細故事喔）"}
+          {viewingFactItem?.historyDescription && (
+            <div className="nook-card p-5 bg-[#FFFAFA]">
+              <h4 className="font-black text-[#5E5340] mb-3 flex items-center text-lg">
+                <FontAwesomeIcon icon={faBookOpen} className="mr-2 text-brown-400" />
+                歷史故事
+              </h4>
+              <div className="text-[#796C53] font-bold leading-relaxed whitespace-pre-wrap">
+                {viewingFactItem.historyDescription}
+              </div>
             </div>
-          </div>
+          )}
 
           <button 
             onClick={() => setIsFactModalOpen(false)}

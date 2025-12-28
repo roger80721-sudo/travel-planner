@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, faLocationArrow
+  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, faLocationArrow, faBookOpen
 } from '@fortawesome/free-solid-svg-icons';
 
 export interface ScheduleItem {
@@ -12,8 +12,9 @@ export interface ScheduleItem {
   duration?: string;
   location?: string;
   weather?: string;
-  factSummary?: string;
-  factDetails?: string;
+  // ▼▼▼ 修改：欄位更名與區分 ▼▼▼
+  coldKnowledge?: string;   // 冷知識 (短，顯示在卡片)
+  historyDescription?: string; // 歷史故事 (長，卡片顯示摘要，點擊看全文)
 }
 
 const TYPE_CONFIG = {
@@ -33,13 +34,15 @@ interface TimelineItemProps {
 
 export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: TimelineItemProps) => {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.activity;
-  const hasFact = item.type === 'activity' && item.factSummary;
+  
+  // 判斷是否有內容
+  const hasColdKnowledge = item.type === 'activity' && item.coldKnowledge;
+  const hasHistory = item.type === 'activity' && item.historyDescription;
 
   // 處理導航點擊
   const handleNavigate = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 阻止冒泡，避免觸發編輯 Modal
+    e.stopPropagation();
     if (item.location) {
-      // 開啟 Google Maps 導航模式 (travelmode=driving)
       window.open(
         `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.location)}&travelmode=driving`,
         '_blank'
@@ -81,7 +84,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
               {item.title}
             </h3>
             
-            {/* ▼▼▼ 新增：自駕導航按鈕 ▼▼▼ */}
             {item.location && (
               <button
                 onClick={handleNavigate}
@@ -91,7 +93,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
                 <FontAwesomeIcon icon={faLocationArrow} className="text-sm transform -rotate-45 translate-x-0.5 translate-y-0.5" />
               </button>
             )}
-            {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
           </div>
           
           <div className="flex flex-wrap gap-2 mt-2">
@@ -116,25 +117,42 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
           </div>
         </div>
 
-        {hasFact && (
+        {/* ▼▼▼ 導遊資訊區塊 (點擊觸發 onFactClick) ▼▼▼ */}
+        {(hasColdKnowledge || hasHistory) && (
           <div 
             onClick={(e) => {
               e.stopPropagation();
               onFactClick(item);
             }}
-            className="bg-[#FFF8E1] border-t-2 border-dashed border-[#F2F4E7] p-3 flex items-start space-x-2 hover:bg-[#FFF3E0] transition-colors"
+            className="border-t-2 border-dashed border-[#F2F4E7] hover:bg-[#FFF8E1] transition-colors"
           >
-             <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 mt-0.5" />
-             <div className="flex-1">
-               <p className="text-xs font-bold text-[#796C53] line-clamp-2">
-                 <span className="text-orange-500 mr-1">冷知識｜</span>
-                 {item.factSummary}
-               </p>
-               <div className="text-[10px] text-orange-400 font-bold mt-1 flex items-center justify-end">
-                 <FontAwesomeIcon icon={faScroll} className="mr-1" />
-                 點擊看故事
-               </div>
-             </div>
+            {/* 1. 冷知識區塊 (黃色底) */}
+            {hasColdKnowledge && (
+              <div className="p-3 flex items-start space-x-2 bg-[#FFFDE7]">
+                 <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 mt-0.5 text-xs" />
+                 <p className="text-xs font-bold text-[#796C53] line-clamp-2">
+                   <span className="text-orange-500 mr-1">冷知識｜</span>
+                   {item.coldKnowledge}
+                 </p>
+              </div>
+            )}
+
+            {/* 2. 歷史故事區塊 (白色底，只顯示一行簡述) */}
+            {hasHistory && (
+              <div className="p-3 flex items-start space-x-2 bg-white/50">
+                 <FontAwesomeIcon icon={faBookOpen} className="text-brown-500 mt-0.5 text-xs opacity-50" />
+                 <div className="flex-1">
+                   <p className="text-xs font-bold text-gray-400 line-clamp-1">
+                     <span className="mr-1">歷史｜</span>
+                     {item.historyDescription}
+                   </p>
+                   <div className="text-[10px] text-orange-400 font-bold mt-1 flex items-center justify-end">
+                     <FontAwesomeIcon icon={faScroll} className="mr-1" />
+                     點擊看完整故事
+                   </div>
+                 </div>
+              </div>
+            )}
           </div>
         )}
       </div>

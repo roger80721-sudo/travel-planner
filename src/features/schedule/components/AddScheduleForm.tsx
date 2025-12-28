@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faTrashCan, faLightbulb, faBookOpen, faWandMagicSparkles, faSpinner, faCloudBolt
+  faLocationDot, faClock, faTrashCan, faLightbulb, faBookOpen, 
+  faWandMagicSparkles, faSpinner, faCloudBolt
 } from '@fortawesome/free-solid-svg-icons';
 import type { ScheduleItem } from './TimelineItem';
 
@@ -22,7 +23,7 @@ const WEATHER_OPTIONS = [
 
 interface AddScheduleFormProps {
   initialData?: ScheduleItem | null;
-  date: string; // 新增：接收日期參數
+  date: string;
   onSubmit: (item: Omit<ScheduleItem, 'id'>) => void;
   onDelete?: () => void;
   onCancel: () => void;
@@ -36,8 +37,9 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
   const [location, setLocation] = useState('');
   const [weather, setWeather] = useState('');
   
-  const [factSummary, setFactSummary] = useState('');
-  const [factDetails, setFactDetails] = useState('');
+  // ▼▼▼ 修改狀態名稱 ▼▼▼
+  const [coldKnowledge, setColdKnowledge] = useState(''); // 冷知識
+  const [historyDescription, setHistoryDescription] = useState(''); // 歷史故事
   
   const [isSearching, setIsSearching] = useState(false);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
@@ -50,8 +52,9 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       setDuration(initialData.duration || '');
       setLocation(initialData.location || '');
       setWeather(initialData.weather || '');
-      setFactSummary(initialData.factSummary || '');
-      setFactDetails(initialData.factDetails || '');
+      // 載入對應資料
+      setColdKnowledge(initialData.coldKnowledge || '');
+      setHistoryDescription(initialData.historyDescription || '');
     }
   }, [initialData]);
 
@@ -76,9 +79,14 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
         alert('抱歉，維基百科找不到這個景點的資料 😅');
       } else {
         const fullText = pages[pageId].extract;
-        setFactDetails(fullText);
+        
+        // 自動填入：
+        // 1. 歷史故事 = 完整維基百科摘要
+        setHistoryDescription(fullText);
+        
+        // 2. 冷知識 = 取第一句話 (因為維基百科通常不含趣味冷知識，暫時用第一句話代替，使用者可自行修改為更有趣的內容)
         const summary = fullText.substring(0, 45).replace(/\n/g, '') + '...';
-        setFactSummary(summary);
+        setColdKnowledge(summary); 
       }
     } catch (error) {
       alert('網路連線錯誤，無法搜尋');
@@ -87,9 +95,8 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
     }
   };
 
-  // ▼▼▼ 自動氣象查詢 ▼▼▼
+  // 自動氣象查詢
   const handleAutoWeather = async () => {
-    // 檢查日期是否在未來 14 天內 (Open-Meteo 限制)
     const tripDate = new Date(date);
     const today = new Date();
     const diffDays = Math.ceil((tripDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -99,7 +106,7 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       return;
     }
 
-    const searchLoc = location || title; // 如果沒填地點，就用標題查
+    const searchLoc = location || title;
     if (!searchLoc) {
       alert('請先輸入「地點」或「標題」才能查詢天氣！');
       return;
@@ -107,19 +114,16 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
 
     setIsWeatherLoading(true);
     try {
-      // 1. 地理編碼 (Geocoding)：把地名轉經緯度
       const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchLoc)}&count=1&language=zh&format=json`);
       const geoData = await geoRes.json();
 
       if (!geoData.results || geoData.results.length === 0) {
-        alert('找不到這個地點的經緯度 😭\n請試著輸入更精確的地點 (例如 "Kyoto")');
+        alert('找不到這個地點的經緯度 😭');
         setIsWeatherLoading(false);
         return;
       }
 
       const { latitude, longitude } = geoData.results[0];
-
-      // 2. 查詢天氣 (Weather Forecast)
       const weatherRes = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${date}&end_date=${date}`
       );
@@ -135,18 +139,14 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       const maxTemp = weatherData.daily.temperature_2m_max[0];
       const minTemp = weatherData.daily.temperature_2m_min[0];
 
-      // 3. 自動對應天氣代碼 (WMO Code)
-      // 0,1 = 晴天; 2,3,45,48 = 多雲; 51以上 = 雨
       if (code <= 1) setWeather('sunny');
       else if (code <= 48) setWeather('cloudy');
       else setWeather('rainy');
 
-      // 4. 把氣溫貼心地附註在地點後面
       const tempString = ` (${minTemp}°C~${maxTemp}°C)`;
       if (!location.includes('°C')) {
          setLocation((prev) => prev ? prev + tempString : searchLoc + tempString);
       }
-
       alert(`查詢成功！\n天氣：${code <= 1 ? '晴天' : code <= 48 ? '多雲' : '下雨'}\n氣溫：${minTemp}°C ~ ${maxTemp}°C`);
 
     } catch (error) {
@@ -156,7 +156,6 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       setIsWeatherLoading(false);
     }
   };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,8 +167,9 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       duration,
       location,
       weather,
-      factSummary: type === 'activity' ? factSummary : undefined,
-      factDetails: type === 'activity' ? factDetails : undefined,
+      // 只有活動類型才儲存故事
+      coldKnowledge: type === 'activity' ? coldKnowledge : undefined,
+      historyDescription: type === 'activity' ? historyDescription : undefined,
     });
   };
 
@@ -236,27 +236,27 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
                </button>
              </div>
              
+             {/* ▼▼▼ 修改輸入欄位 ▼▼▼ */}
              <div>
-               <label className="label-text text-yellow-600">冷知識簡述 (顯示在卡片上)</label>
+               <label className="label-text text-yellow-600">💡 冷知識 (有趣的短知識)</label>
                <input 
                  type="text" 
-                 value={factSummary} 
-                 onChange={e => setFactSummary(e.target.value)} 
-                 placeholder="點擊上方按鈕自動搜尋，或手動輸入..." 
+                 value={coldKnowledge} 
+                 onChange={e => setColdKnowledge(e.target.value)} 
+                 placeholder="例如：這裡的柱子沒用一根釘子" 
                  className="input-style w-full border-yellow-200 focus:border-yellow-400" 
-                 maxLength={50}
                />
              </div>
 
              <div>
                <label className="label-text text-yellow-600 flex items-center">
                  <FontAwesomeIcon icon={faBookOpen} className="mr-1" />
-                 詳細歷史故事
+                 📖 歷史故事 (詳細背景)
                </label>
                <textarea 
-                 value={factDetails} 
-                 onChange={e => setFactDetails(e.target.value)} 
-                 placeholder="這裡會自動填入詳細介紹..." 
+                 value={historyDescription} 
+                 onChange={e => setHistoryDescription(e.target.value)} 
+                 placeholder="這裡會自動填入維基百科的詳細介紹..." 
                  className="input-style w-full h-32 resize-none border-yellow-200 focus:border-yellow-400"
                />
              </div>
@@ -266,7 +266,6 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
         <div>
           <div className="flex justify-between items-center mb-1">
              <label className="label-text">預測天氣</label>
-             {/* ▼▼▼ 自動氣象按鈕 ▼▼▼ */}
              <button
                type="button"
                onClick={handleAutoWeather}
