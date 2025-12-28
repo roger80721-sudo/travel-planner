@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
   faLocationDot, faClock, faTrashCan, faLightbulb, faBookOpen, 
-  faWandMagicSparkles, faSpinner, faCloudBolt
+  faWandMagicSparkles, faSpinner, faCloudBolt, faNoteSticky
 } from '@fortawesome/free-solid-svg-icons';
 import type { ScheduleItem } from './TimelineItem';
 
@@ -37,9 +37,10 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
   const [location, setLocation] = useState('');
   const [weather, setWeather] = useState('');
   
-  // ▼▼▼ 修改狀態名稱 ▼▼▼
-  const [coldKnowledge, setColdKnowledge] = useState(''); // 冷知識
-  const [historyDescription, setHistoryDescription] = useState(''); // 歷史故事
+  const [coldKnowledge, setColdKnowledge] = useState('');
+  const [historyDescription, setHistoryDescription] = useState('');
+  // 新增：備註狀態
+  const [notes, setNotes] = useState('');
   
   const [isSearching, setIsSearching] = useState(false);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
@@ -52,13 +53,13 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       setDuration(initialData.duration || '');
       setLocation(initialData.location || '');
       setWeather(initialData.weather || '');
-      // 載入對應資料
       setColdKnowledge(initialData.coldKnowledge || '');
       setHistoryDescription(initialData.historyDescription || '');
+      setNotes(initialData.notes || '');
     }
   }, [initialData]);
 
-  // 維基百科搜尋
+  // ▼▼▼ 修正後的維基百科搜尋 ▼▼▼
   const handleAutoGenerate = async () => {
     if (!title) {
       alert('請先輸入「標題」才能搜尋喔！');
@@ -67,8 +68,9 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
 
     setIsSearching(true);
     try {
+      // 關鍵修正：加入 &redirects=1 參數，讓 API 自動處理繁簡轉換或別名重導向
       const response = await fetch(
-        `https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro&explaintext&titles=${encodeURIComponent(title)}`
+        `https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro&explaintext&redirects=1&titles=${encodeURIComponent(title)}`
       );
       const data = await response.json();
       
@@ -80,11 +82,10 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       } else {
         const fullText = pages[pageId].extract;
         
-        // 自動填入：
-        // 1. 歷史故事 = 完整維基百科摘要
+        // 自動填入詳細歷史
         setHistoryDescription(fullText);
         
-        // 2. 冷知識 = 取第一句話 (因為維基百科通常不含趣味冷知識，暫時用第一句話代替，使用者可自行修改為更有趣的內容)
+        // 自動填入冷知識 (取前段文字)
         const summary = fullText.substring(0, 45).replace(/\n/g, '') + '...';
         setColdKnowledge(summary); 
       }
@@ -94,8 +95,8 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       setIsSearching(false);
     }
   };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  // 自動氣象查詢
   const handleAutoWeather = async () => {
     const tripDate = new Date(date);
     const today = new Date();
@@ -167,7 +168,7 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       duration,
       location,
       weather,
-      // 只有活動類型才儲存故事
+      notes, // 儲存備註
       coldKnowledge: type === 'activity' ? coldKnowledge : undefined,
       historyDescription: type === 'activity' ? historyDescription : undefined,
     });
@@ -215,6 +216,21 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
           <label className="label-text"><FontAwesomeIcon icon={faLocationDot} className="mr-1" />地點/地址</label>
           <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="建議填寫，以便查詢天氣" className="input-style w-full" />
         </div>
+
+        {/* ▼▼▼ 新增：備註輸入框 ▼▼▼ */}
+        <div>
+          <label className="label-text flex items-center">
+            <FontAwesomeIcon icon={faNoteSticky} className="mr-1 text-gray-400" />
+            備註 (選填)
+          </label>
+          <textarea 
+            value={notes} 
+            onChange={e => setNotes(e.target.value)} 
+            placeholder="例如：3號出口集合、記得帶御朱印帳..." 
+            className="input-style w-full h-20 resize-none text-sm"
+          />
+        </div>
+        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
         
         {type === 'activity' && (
           <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 space-y-3 relative overflow-hidden">
@@ -236,7 +252,6 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
                </button>
              </div>
              
-             {/* ▼▼▼ 修改輸入欄位 ▼▼▼ */}
              <div>
                <label className="label-text text-yellow-600">💡 冷知識 (有趣的短知識)</label>
                <input 

@@ -17,7 +17,7 @@ export interface ScheduleDay {
   items: ScheduleItem[];
 }
 
-// 預設資料 (需更新欄位)
+// 更新預設資料，加入範例備註
 const INITIAL_DATA: ScheduleDay[] = [
   {
     date: '2025-02-27',
@@ -25,8 +25,9 @@ const INITIAL_DATA: ScheduleDay[] = [
     items: [
       { 
         id: '1', time: '10:00', type: 'activity', title: '清水寺', duration: '2h', location: '京都', weather: 'sunny',
-        coldKnowledge: '你知道這裡的舞台沒用一根釘子嗎？', // 冷知識
-        historyDescription: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子，採用的是日本傳統的「懸造法」建築工藝。這句「從清水舞台跳下去」（清水の舞台から飛び降りる）的日本諺語，就是形容抱著必死的決心去做某件事喔！' // 歷史故事
+        coldKnowledge: '你知道這裡的舞台沒用一根釘子嗎？',
+        historyDescription: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子。',
+        notes: '記得帶御朱印帳！從 3 號出口走比較近。' // 範例備註
       },
     ] as ScheduleItem[]
   }
@@ -53,13 +54,14 @@ export const SchedulePage = () => {
       
       const cloudSchedules = await loadFromCloud('travel-planner-data');
       if (cloudSchedules) {
-        // 資料遷移 (相容舊版欄位)
+        // 資料遷移：確保 notes 欄位存在
         const migrated = cloudSchedules.map((day: any) => ({
           ...day,
           items: day.items.map((item: any) => ({
             ...item,
-            coldKnowledge: item.coldKnowledge || item.factSummary, // 相容舊版 factSummary
-            historyDescription: item.historyDescription || item.factDetails // 相容舊版 factDetails
+            coldKnowledge: item.coldKnowledge || item.factSummary,
+            historyDescription: item.historyDescription || item.factDetails,
+            notes: item.notes || '' // 舊資料補上空字串
           }))
         }));
         setSchedules(migrated);
@@ -298,7 +300,6 @@ export const SchedulePage = () => {
         onClose={() => setIsFactModalOpen(false)} 
         title={viewingFactItem?.title || "景點導覽"}
       >
-        {/* ▼▼▼ 修改：顯示冷知識與歷史故事 ▼▼▼ */}
         <div className="space-y-4">
           {viewingFactItem?.coldKnowledge && (
             <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 flex items-start space-x-3">

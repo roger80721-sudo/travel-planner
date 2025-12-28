@@ -1,7 +1,8 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, faLocationArrow, faBookOpen
+  faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, 
+  faLocationArrow, faBookOpen, faNoteSticky 
 } from '@fortawesome/free-solid-svg-icons';
 
 export interface ScheduleItem {
@@ -12,9 +13,10 @@ export interface ScheduleItem {
   duration?: string;
   location?: string;
   weather?: string;
-  // ▼▼▼ 修改：欄位更名與區分 ▼▼▼
-  coldKnowledge?: string;   // 冷知識 (短，顯示在卡片)
-  historyDescription?: string; // 歷史故事 (長，卡片顯示摘要，點擊看全文)
+  coldKnowledge?: string;
+  historyDescription?: string;
+  // ▼▼▼ 新增：備註欄位 ▼▼▼
+  notes?: string; 
 }
 
 const TYPE_CONFIG = {
@@ -35,11 +37,9 @@ interface TimelineItemProps {
 export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: TimelineItemProps) => {
   const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.activity;
   
-  // 判斷是否有內容
   const hasColdKnowledge = item.type === 'activity' && item.coldKnowledge;
   const hasHistory = item.type === 'activity' && item.historyDescription;
 
-  // 處理導航點擊
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (item.location) {
@@ -66,7 +66,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
         </div>
       </div>
 
-      {/* 卡片本體 */}
       <div 
         onClick={() => onEditClick(item)}
         className={`
@@ -115,9 +114,17 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
               </span>
             )}
           </div>
+
+          {/* ▼▼▼ 新增：備註顯示區塊 ▼▼▼ */}
+          {item.notes && (
+            <div className="mt-3 flex items-start space-x-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+              <FontAwesomeIcon icon={faNoteSticky} className="text-gray-400 text-xs mt-0.5" />
+              <p className="text-xs font-bold text-gray-500 whitespace-pre-wrap">{item.notes}</p>
+            </div>
+          )}
+          {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
         </div>
 
-        {/* ▼▼▼ 導遊資訊區塊 (點擊觸發 onFactClick) ▼▼▼ */}
         {(hasColdKnowledge || hasHistory) && (
           <div 
             onClick={(e) => {
@@ -126,7 +133,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
             }}
             className="border-t-2 border-dashed border-[#F2F4E7] hover:bg-[#FFF8E1] transition-colors"
           >
-            {/* 1. 冷知識區塊 (黃色底) */}
             {hasColdKnowledge && (
               <div className="p-3 flex items-start space-x-2 bg-[#FFFDE7]">
                  <FontAwesomeIcon icon={faLightbulb} className="text-yellow-500 mt-0.5 text-xs" />
@@ -137,7 +143,6 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
               </div>
             )}
 
-            {/* 2. 歷史故事區塊 (白色底，只顯示一行簡述) */}
             {hasHistory && (
               <div className="p-3 flex items-start space-x-2 bg-white/50">
                  <FontAwesomeIcon icon={faBookOpen} className="text-brown-500 mt-0.5 text-xs opacity-50" />
