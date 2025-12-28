@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：移除了沒用到的 faRotateLeft ▼▼▼
 import { 
   faPlus, faTrashCan, faCheck, faCloudArrowDown, 
   faPalette, faUserGroup, faPen 
@@ -8,7 +7,6 @@ import {
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
-// 資料結構
 interface CheckItem {
   id: string;
   text: string;
@@ -39,6 +37,8 @@ const INITIAL_CATEGORIES: Category[] = [
 export const PreparationPage = () => {
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [members, setMembers] = useState<string[]>(['我']);
+  // 新增：成員顏色
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentMember, setCurrentMember] = useState<string>('我');
@@ -57,6 +57,12 @@ export const PreparationPage = () => {
       if (cloudMembers && cloudMembers.length > 0) {
         setMembers(cloudMembers);
         setCurrentMember(cloudMembers[0]);
+      }
+
+      // 新增：載入成員顏色
+      const cloudColors = await loadFromCloud('travel-member-colors');
+      if (cloudColors) {
+        setMemberColors(cloudColors);
       }
 
       const cloudData = await loadFromCloud('travel-preparation-data');
@@ -213,16 +219,18 @@ export const PreparationPage = () => {
           <button
             key={m}
             onClick={() => { setCurrentMember(m); setViewMode('individual'); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border-2 relative
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border-2 relative pl-8 pr-4
               ${viewMode === 'individual' && currentMember === m
                 ? 'bg-white text-[#5C4033] border-[#5C4033] shadow-md' 
                 : 'bg-white text-gray-400 border-transparent'}`}
           >
-            {m}
+            {/* ▼▼▼ 修改：顯示成員代表色 ▼▼▼ */}
             <span 
-              className="absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white"
-              style={{ backgroundColor: calculateProgress(m) === 100 ? '#4ADE80' : calculateProgress(m) > 0 ? '#FBBF24' : '#E5E7EB' }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border border-gray-100"
+              style={{ backgroundColor: memberColors[m] || '#eee' }}
             />
+            {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+            {m}
           </button>
         ))}
       </div>
@@ -235,13 +243,17 @@ export const PreparationPage = () => {
             return (
               <div key={m} className="space-y-1">
                 <div className="flex justify-between text-xs font-bold text-gray-600">
-                  <span>{m}</span>
+                  <span className="flex items-center">
+                    {/* 總覽也加上顏色點點 */}
+                    <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: memberColors[m] || '#ccc' }}></span>
+                    {m}
+                  </span>
                   <span>{prog}%</span>
                 </div>
                 <div className="h-2.5 bg-[#F2F4E7] rounded-full overflow-hidden">
                    <div 
                      className="h-full transition-all duration-500 rounded-full" 
-                     style={{ width: `${prog}%`, backgroundColor: prog === 100 ? '#3AA986' : '#F3A76C' }} 
+                     style={{ width: `${prog}%`, backgroundColor: prog === 100 ? '#3AA986' : (memberColors[m] || '#F3A76C') }} 
                    />
                 </div>
               </div>
@@ -261,8 +273,8 @@ export const PreparationPage = () => {
              </div>
              <div className="h-4 bg-[#F2F4E7] rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-[#8DD2BA] transition-all duration-500" 
-                  style={{ width: `${calculateProgress(currentMember)}%` }} 
+                  className="h-full transition-all duration-500" 
+                  style={{ width: `${calculateProgress(currentMember)}%`, backgroundColor: calculateProgress(currentMember) === 100 ? '#3AA986' : '#8DD2BA' }} 
                 />
              </div>
           </div>

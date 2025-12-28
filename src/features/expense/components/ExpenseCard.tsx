@@ -1,123 +1,86 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faUtensils, faTrainSubway, faBagShopping, faTicket, faEllipsis, 
-  faPen, faTrashCan, faLocationDot, faMoneyBill, faCreditCard, faMobileScreen, faIdCard, faUserGroup 
-} from '@fortawesome/free-solid-svg-icons'; // 修正：已移除沒用到的 faYenSign, faDollarSign
+import { faTrashCan, faPen, faUser } from '@fortawesome/free-solid-svg-icons';
 
 export interface ExpenseItem {
   id: string;
-  title: string;
+  item: string;
   amount: number;
-  category: string;
+  currency: 'TWD' | 'JPY';
+  payer: string;
+  involved: string[];
   date: string;
-  currency?: 'JPY' | 'TWD'; 
-  payer?: string;
-  involved?: string[];
-  method?: 'cash' | 'card' | 'suica' | 'mobile';
-  location?: string;
-  photoUrl?: string;
 }
-
-const CATEGORIES: Record<string, any> = {
-  food: { icon: faUtensils, bg: 'bg-orange-100', text: 'text-orange-500' },
-  transport: { icon: faTrainSubway, bg: 'bg-blue-100', text: 'text-blue-500' },
-  shopping: { icon: faBagShopping, bg: 'bg-pink-100', text: 'text-pink-500' },
-  entertainment: { icon: faTicket, bg: 'bg-purple-100', text: 'text-purple-500' },
-  other: { icon: faEllipsis, bg: 'bg-gray-100', text: 'text-gray-500' },
-};
-
-const METHODS: Record<string, any> = {
-  cash: { icon: faMoneyBill, label: '現金' },
-  card: { icon: faCreditCard, label: '信用卡' },
-  suica: { icon: faIdCard, label: 'IC卡' },
-  mobile: { icon: faMobileScreen, label: 'Pay' },
-};
 
 interface ExpenseCardProps {
   item: ExpenseItem;
   exchangeRate: number;
+  memberColors: Record<string, string>; // 新增：接收成員顏色表
   onEdit: (item: ExpenseItem) => void;
   onDelete: (id: string) => void;
 }
 
-export const ExpenseCard = ({ item, exchangeRate, onEdit, onDelete }: ExpenseCardProps) => {
-  const cat = CATEGORIES[item.category] || CATEGORIES.other;
-  const payMethod = METHODS[item.method || 'cash'];
-  const involvedCount = item.involved?.length || 0;
-  const involvedText = involvedCount > 0 ? `${involvedCount} 人分攤` : '全員分攤';
-
-  // 預設為日幣
-  const currency = item.currency || 'JPY';
+export const ExpenseCard = ({ item, exchangeRate, memberColors, onEdit, onDelete }: ExpenseCardProps) => {
+  const amountTWD = item.currency === 'JPY' ? Math.round(item.amount * exchangeRate) : item.amount;
+  
+  // 判斷是誰參與 (如果 involved 是空的，代表是全體或個人，這邊依賴上層邏輯，通常 involved 至少會有 payer)
+  // 這裡我們假設 involved 如果存在就顯示，不存在就顯示 "全體"
+  const involvedMembers = item.involved && item.involved.length > 0 ? item.involved : [item.payer];
 
   return (
-    <div className="bg-white rounded-2xl shadow-[4px_4px_0px_0px_#E0E5D5] border-2 border-transparent hover:border-orange-200 transition-all overflow-hidden relative group">
-      
-      {item.photoUrl && (
-        <div className="h-32 w-full relative overflow-hidden">
-          <img 
-            src={item.photoUrl} 
-            alt={item.title} 
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-            onError={(e) => (e.currentTarget.style.display = 'none')} 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-          <div className="absolute bottom-2 left-3 text-white text-xs font-bold flex items-center">
-            {item.location && <><FontAwesomeIcon icon={faLocationDot} className="mr-1" /> {item.location}</>}
-          </div>
+    <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#F2F4E7] flex justify-between items-center group relative">
+      <div className="flex-1">
+        <div className="flex items-center space-x-2 mb-1">
+          <span className="font-black text-[#5E5340] text-lg">{item.item}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${item.currency === 'JPY' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+            {item.currency}
+          </span>
         </div>
-      )}
+        
+        <div className="flex items-center space-x-2 text-xs text-gray-400 font-bold">
+          <span className="flex items-center">
+            <FontAwesomeIcon icon={faUser} className="mr-1 opacity-50" />
+            {item.payer} 先付
+          </span>
+          <span>•</span>
+          <span>{item.date}</span>
+        </div>
 
-      <div className="p-4 flex items-center">
-        {!item.photoUrl && (
-          <div className={`w-12 h-12 rounded-full ${cat.bg} ${cat.text} flex items-center justify-center text-lg mr-4 flex-shrink-0`}>
-            <FontAwesomeIcon icon={cat.icon} />
+        {/* ▼▼▼ 新增：顯示分帳成員的代表色點點 ▼▼▼ */}
+        <div className="flex items-center mt-2 space-x-1">
+          {involvedMembers.map((member) => (
+            <div 
+              key={member}
+              className="w-3 h-3 rounded-full border border-white shadow-sm"
+              style={{ backgroundColor: memberColors[member] || '#E5E7EB' }} // 如果沒設定顏色就顯示灰色
+              title={member}
+            />
+          ))}
+          {involvedMembers.length > 1 && (
+             <span className="text-[10px] text-gray-400 ml-1">分攤</span>
+          )}
+        </div>
+        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+      </div>
+
+      <div className="text-right">
+        <div className="font-black text-[#5E5340] text-xl font-mono">
+          {item.currency === 'JPY' ? `¥${item.amount.toLocaleString()}` : `$${item.amount.toLocaleString()}`}
+        </div>
+        {item.currency === 'JPY' && (
+          <div className="text-xs text-gray-400 font-bold">
+            ≈ NT$ {amountTWD.toLocaleString()}
           </div>
         )}
+      </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="font-bold text-gray-700 truncate">{item.title}</h3>
-            
-            <div className="text-right">
-              {/* 主要金額顯示 */}
-              <div className={`font-black text-lg font-mono ${currency === 'TWD' ? 'text-green-600' : 'text-gray-800'}`}>
-                {currency === 'JPY' ? '¥' : 'NT$'} {Number(item.amount).toLocaleString()}
-              </div>
-              
-              {/* 如果是日幣，顯示換算後的台幣 */}
-              {currency === 'JPY' && (
-                <div className="text-[10px] font-bold text-gray-400">
-                  ≈ NT$ {Math.round(item.amount * exchangeRate).toLocaleString()}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center flex-wrap gap-2 text-[10px] font-bold text-gray-400">
-             <span>{item.date}</span>
-             
-             <span className="bg-gray-100 px-2 py-0.5 rounded-md flex items-center text-gray-500">
-               {item.payer || '我'}
-               <span className="mx-1">•</span>
-               <FontAwesomeIcon icon={payMethod.icon} className="mr-1" />
-               {payMethod.label}
-             </span>
-
-             <span className="flex items-center text-orange-400">
-               <FontAwesomeIcon icon={faUserGroup} className="mr-1" />
-               {involvedText}
-             </span>
-          </div>
-        </div>
-
-        <div className="absolute right-2 bottom-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-lg p-1">
-          <button onClick={() => onEdit(item)} className="p-2 text-gray-300 hover:text-blue-400">
-            <FontAwesomeIcon icon={faPen} />
-          </button>
-          <button onClick={() => onDelete(item.id)} className="p-2 text-gray-300 hover:text-red-400">
-            <FontAwesomeIcon icon={faTrashCan} />
-          </button>
-        </div>
+      {/* 操作按鈕 (懸停顯示) */}
+      <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onEdit(item)} className="p-2 text-gray-300 hover:text-blue-400">
+          <FontAwesomeIcon icon={faPen} />
+        </button>
+        <button onClick={() => onDelete(item.id)} className="p-2 text-gray-300 hover:text-red-400">
+          <FontAwesomeIcon icon={faTrashCan} />
+        </button>
       </div>
     </div>
   );
