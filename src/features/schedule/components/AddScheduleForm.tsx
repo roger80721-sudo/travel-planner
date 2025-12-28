@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：移除了沒用到的 faCloudSun ▼▼▼
 import { 
   faTrainSubway, faUtensils, faBed, faCamera, faBagShopping, 
-  faLocationDot, faClock, faTrashCan, faLightbulb, faBookOpen
+  faLocationDot, faClock, faTrashCan, faLightbulb, faBookOpen, faWandMagicSparkles, faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 import type { ScheduleItem } from './TimelineItem';
 
@@ -38,6 +37,9 @@ export const AddScheduleForm = ({ initialData, onSubmit, onDelete, onCancel }: A
   
   const [factSummary, setFactSummary] = useState('');
   const [factDetails, setFactDetails] = useState('');
+  
+  // 新增：搜尋狀態
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -51,6 +53,45 @@ export const AddScheduleForm = ({ initialData, onSubmit, onDelete, onCancel }: A
       setFactDetails(initialData.factDetails || '');
     }
   }, [initialData]);
+
+  // ▼▼▼ 自動搜尋維基百科的函式 ▼▼▼
+  const handleAutoGenerate = async () => {
+    if (!title) {
+      alert('請先輸入「標題」才能搜尋喔！');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // 呼叫維基百科 API (中文版)
+      const response = await fetch(
+        `https://zh.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=extracts&exintro&explaintext&titles=${encodeURIComponent(title)}`
+      );
+      const data = await response.json();
+      
+      const pages = data.query.pages;
+      const pageId = Object.keys(pages)[0]; // 取得第一個搜尋結果
+
+      if (pageId === '-1') {
+        alert('抱歉，維基百科找不到這個景點的資料 😅\n請試著縮短名稱 (例如 "清水寺" 而不是 "京都清水寺")');
+      } else {
+        const fullText = pages[pageId].extract;
+        
+        // 1. 自動填入詳細故事 (完整介紹)
+        setFactDetails(fullText);
+
+        // 2. 自動擷取簡述 (取前 45 個字)
+        const summary = fullText.substring(0, 45).replace(/\n/g, '') + '...';
+        setFactSummary(summary);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('網路連線錯誤，無法搜尋');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,11 +152,27 @@ export const AddScheduleForm = ({ initialData, onSubmit, onDelete, onCancel }: A
         </div>
         
         {type === 'activity' && (
-          <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 space-y-3">
-             <h3 className="font-bold text-yellow-700 flex items-center">
-               <FontAwesomeIcon icon={faLightbulb} className="mr-2" />
-               景點小導遊
-             </h3>
+          <div className="bg-yellow-50 p-4 rounded-2xl border-2 border-yellow-100 space-y-3 relative overflow-hidden">
+             
+             {/* 標題與自動搜尋按鈕 */}
+             <div className="flex justify-between items-center">
+               <h3 className="font-bold text-yellow-700 flex items-center">
+                 <FontAwesomeIcon icon={faLightbulb} className="mr-2" />
+                 景點小導遊
+               </h3>
+               
+               {/* ▼▼▼ 自動搜尋按鈕 ▼▼▼ */}
+               <button 
+                 type="button"
+                 onClick={handleAutoGenerate}
+                 disabled={isSearching || !title}
+                 className="text-xs bg-white text-yellow-600 border border-yellow-300 px-3 py-1.5 rounded-full font-bold shadow-sm active:scale-95 transition-all disabled:opacity-50 flex items-center"
+               >
+                 {isSearching ? <FontAwesomeIcon icon={faSpinner} spin className="mr-1" /> : <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-1" />}
+                 {isSearching ? '搜尋中...' : '自動搜尋'}
+               </button>
+               {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+             </div>
              
              <div>
                <label className="label-text text-yellow-600">冷知識簡述 (顯示在卡片上)</label>
@@ -123,7 +180,7 @@ export const AddScheduleForm = ({ initialData, onSubmit, onDelete, onCancel }: A
                  type="text" 
                  value={factSummary} 
                  onChange={e => setFactSummary(e.target.value)} 
-                 placeholder="一句話吸引目光，例如：你知道這裡的柱子沒用一根釘子嗎？" 
+                 placeholder="點擊上方按鈕自動搜尋，或手動輸入..." 
                  className="input-style w-full border-yellow-200 focus:border-yellow-400" 
                  maxLength={50}
                />
@@ -137,7 +194,7 @@ export const AddScheduleForm = ({ initialData, onSubmit, onDelete, onCancel }: A
                <textarea 
                  value={factDetails} 
                  onChange={e => setFactDetails(e.target.value)} 
-                 placeholder="在這裡寫下詳細的故事或背景介紹..." 
+                 placeholder="這裡會自動填入詳細介紹..." 
                  className="input-style w-full h-32 resize-none border-yellow-200 focus:border-yellow-400"
                />
              </div>
