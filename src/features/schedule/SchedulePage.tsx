@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：補上了 faLightbulb ▼▼▼
 import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowDown, faBookOpen, faLightbulb } from '@fortawesome/free-solid-svg-icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
@@ -269,8 +268,10 @@ export const SchedulePage = () => {
       </button>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "編輯行程" : "新增行程"}>
+        {/* ▼▼▼ 修正：傳入 date 屬性 ▼▼▼ */}
         <AddScheduleForm 
           initialData={editingItem} 
+          date={selectedDate}
           onSubmit={handleSaveItem}
           onDelete={editingItem ? handleDeleteItem : undefined} 
           onCancel={() => setIsModalOpen(false)}
