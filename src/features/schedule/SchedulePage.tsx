@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowUp, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
+// ▼▼▼ 修正：移除了沒用到的 faCloudArrowUp ▼▼▼
+import { faPlus, faPen, faClock, faCalendarDays, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 import { DateSelector } from './components/DateSelector';
@@ -9,7 +10,7 @@ import { Modal } from '../../components/ui/Modal';
 import { AddScheduleForm } from './components/AddScheduleForm';
 import { ManageDatesForm } from './components/ManageDatesForm';
 import { calculateNewTime } from '../../utils/timeUtils';
-import { loadFromCloud, saveToCloud } from '../../utils/supabase'; // 引入雲端工具
+import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
 export interface ScheduleDay {
   date: string;
@@ -28,11 +29,9 @@ const INITIAL_DATA: ScheduleDay[] = [
 ];
 
 export const SchedulePage = () => {
-  // 1. 行程資料
   const [schedules, setSchedules] = useState<ScheduleDay[]>(INITIAL_DATA);
-  const [isLoading, setIsLoading] = useState(true); // 載入中狀態
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 2. 旅程標題
   const [tripTitle, setTripTitle] = useState('我的日本之旅 🇯🇵');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 
@@ -41,16 +40,13 @@ export const SchedulePage = () => {
   const [isDateManageOpen, setIsDateManageOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
 
-  // ▼▼▼ 初始化：從雲端載入資料 ▼▼▼
   useEffect(() => {
     const initData = async () => {
       setIsLoading(true);
       
-      // 載入行程
       const cloudSchedules = await loadFromCloud('travel-planner-data');
       if (cloudSchedules) setSchedules(cloudSchedules);
       
-      // 載入標題
       const cloudTitle = await loadFromCloud('travel-trip-title');
       if (cloudTitle) setTripTitle(cloudTitle);
 
@@ -59,28 +55,19 @@ export const SchedulePage = () => {
     initData();
   }, []);
 
-  // 設定預設選取日期 (當資料載入完成後)
   useEffect(() => {
     if (!isLoading && schedules.length > 0) {
-      // 如果目前選的日期不在列表內，就選第一天
       const exists = schedules.find(d => d.date === selectedDate);
       if (!exists) {
         setSelectedDate(schedules[0].date);
       }
     }
   }, [schedules, isLoading, selectedDate]);
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  // ▼▼▼ 儲存：當資料變動時，存到雲端 ▼▼▼
-  // 為了避免打字時一直存，這裡我們不做 useEffect 自動存，
-  // 而是改成「操作後手動呼叫儲存」或者「Debounce (防抖)」，
-  // 但為了教學簡單，我們直接在修改資料的 function 裡呼叫 saveToCloud。
-  
   const saveAllToCloud = (newSchedules: ScheduleDay[], newTitle?: string) => {
     saveToCloud('travel-planner-data', newSchedules);
     if (newTitle) saveToCloud('travel-trip-title', newTitle);
   };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
   const currentDayIndex = schedules.findIndex(d => d.date === selectedDate);
   const currentItems = schedules[currentDayIndex]?.items || [];
@@ -114,7 +101,7 @@ export const SchedulePage = () => {
     });
     
     setSchedules(newSchedules);
-    saveAllToCloud(newSchedules); // 儲存到雲端
+    saveAllToCloud(newSchedules);
     setIsModalOpen(false);
   };
 
@@ -128,14 +115,14 @@ export const SchedulePage = () => {
         return day;
       });
       setSchedules(newSchedules);
-      saveAllToCloud(newSchedules); // 儲存到雲端
+      saveAllToCloud(newSchedules);
       setIsModalOpen(false);
     }
   };
 
   const handleSaveDates = (newSchedules: ScheduleDay[]) => {
     setSchedules(newSchedules);
-    saveAllToCloud(newSchedules); // 儲存到雲端
+    saveAllToCloud(newSchedules);
     setIsDateManageOpen(false);
   };
 
@@ -158,16 +145,15 @@ export const SchedulePage = () => {
     newSchedules[currentDayIndex] = { ...newSchedules[currentDayIndex], items: newItems };
     
     setSchedules(newSchedules);
-    saveAllToCloud(newSchedules); // 儲存到雲端
+    saveAllToCloud(newSchedules);
   };
 
-  // 修改標題並儲存
   const handleTitleChange = (newTitle: string) => {
     setTripTitle(newTitle);
   };
   const handleTitleBlur = () => {
     setIsEditingTitle(false);
-    saveAllToCloud(schedules, tripTitle); // 儲存標題
+    saveAllToCloud(schedules, tripTitle);
   };
 
   if (isLoading) {
