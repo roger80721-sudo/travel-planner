@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faTrashCan, faCheck, faCloudArrowDown, 
   faPalette, faUserGroup, faPen, faSuitcase, faBagShopping, 
-  faMagnifyingGlassDollar // ✨ 加回這個漂亮的查價圖示
+  faMagnifyingGlassDollar, faCalculator, faArrowRightArrowLeft, faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
@@ -13,7 +13,10 @@ interface CheckItem {
   id: string;
   text: string;
   checkedBy: string[];
-  owner?: string; // 物品的主人
+  owner?: string;
+  // ▼▼▼ 新增：比價欄位 ▼▼▼
+  twPrice?: number; // 台灣價格 (台幣)
+  jpPrice?: number; // 日本價格 (日幣)
 }
 
 interface Category {
@@ -54,10 +57,14 @@ export const PreparationPage = () => {
   
   const [members, setMembers] = useState<string[]>(['我']);
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [exchangeRate, setExchangeRate] = useState<number>(0.22); // 預設匯率
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentMember, setCurrentMember] = useState<string>('我');
   const [viewMode, setViewMode] = useState<'individual' | 'summary'>('individual');
+  
+  // 控制哪個物品正在輸入價格
+  const [pricingItemId, setPricingItemId] = useState<string | null>(null);
 
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -77,6 +84,9 @@ export const PreparationPage = () => {
       const cloudColors = await loadFromCloud('travel-member-colors');
       if (cloudColors) setMemberColors(cloudColors);
 
+      const cloudRate = await loadFromCloud('travel-exchange-rate');
+      if (cloudRate) setExchangeRate(Number(cloudRate));
+
       const cloudPacking = await loadFromCloud('travel-preparation-data');
       if (cloudPacking) setPackingCats(migrateData(cloudPacking, cloudMembers));
 
@@ -95,7 +105,9 @@ export const PreparationPage = () => {
       items: cat.items.map((item: any) => ({
         ...item,
         checkedBy: item.checkedBy || (item.checked ? [currentMembers?.[0] || '我'] : []),
-        owner: item.owner || undefined
+        owner: item.owner || undefined,
+        twPrice: item.twPrice || undefined,
+        jpPrice: item.jpPrice || undefined
       }))
     }));
   };
@@ -114,7 +126,6 @@ export const PreparationPage = () => {
 
   const toggleCheck = (catId: string, itemId: string) => {
     if (viewMode === 'summary') return;
-
     const newCategories = currentCategories.map(cat => {
       if (cat.id === catId) {
         return {
@@ -141,7 +152,6 @@ export const PreparationPage = () => {
 
   const handleSaveCategory = () => {
     if (!formCatTitle.trim()) return;
-
     let newCategories;
     if (editingCat) {
       newCategories = currentCategories.map(c => 
@@ -178,7 +188,6 @@ export const PreparationPage = () => {
                 id: Date.now().toString(), 
                 text, 
                 checkedBy: [],
-                // 關鍵：購物模式下，標記此物品屬於當前成員
                 owner: activeTab === 'shopping' ? currentMember : undefined 
               }] 
             };
@@ -201,40 +210,48 @@ export const PreparationPage = () => {
     saveCurrentData(newCategories);
   };
 
-  // ▼▼▼ 修正後的智慧查價功能 ▼▼▼
-  const handlePriceCheck = (itemName: string) => {
-    // 改用 Google 搜尋，關鍵字：「商品名 + 日本 + 価格」
-    // Google 會自動辨識「合利他命」並搜尋「アリナミン」相關的日本網站 (Kakaku/Amazon/松本清)
-    const query = `${itemName} 日本 価格`;
-    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    window.open(url, '_blank');
+  // ▼▼▼ 更新價格 ▼▼▼
+  const updatePrice = (catId: string, itemId: string, field: 'twPrice' | 'jpPrice', value: string) => {
+    const numValue = value === '' ? undefined : Number(value);
+    const newCategories = currentCategories.map(cat => {
+      if (cat.id === catId) {
+        return {
+          ...cat,
+          items: cat.items.map(item => item.id === itemId ? { ...item, [field]: numValue } : item)
+        };
+      }
+      return cat;
+    });
+    saveCurrentData(newCategories);
   };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+  // 搜尋功能
+  const searchPrice = (keyword: string, country: 'TW' | 'JP') => {
+    const query = country === 'TW' ? `${keyword} 價格` : `${keyword} 日本 価格`;
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+  };
 
   const calculateProgress = (member: string) => {
     let myItems = 0;
     let myChecked = 0;
-
     currentCategories.forEach(cat => {
       cat.items.forEach(item => {
         if (activeTab === 'shopping') {
-          // 購物清單：只計算屬於該成員的
           if (item.owner === member) {
             myItems++;
             if (item.checkedBy.includes(member)) myChecked++;
           }
         } else {
-          // 行李清單：全體共用
           myItems++;
           if (item.checkedBy.includes(member)) myChecked++;
         }
       });
     });
-
     if (myItems === 0) return 0;
     return Math.round((myChecked / myItems) * 100);
   };
 
+  // Modal helpers
   const openAddCatModal = () => {
     setEditingCat(null);
     setFormCatTitle('');
@@ -259,7 +276,7 @@ export const PreparationPage = () => {
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {/* 頂部切換 Tab */}
+      {/* 頂部 Tab */}
       <div className="bg-[#F2F4E7] p-1 rounded-2xl flex space-x-1 mb-4 border-2 border-[#E5E7EB]">
         <button 
           onClick={() => setActiveTab('packing')}
@@ -279,6 +296,7 @@ export const PreparationPage = () => {
         </button>
       </div>
 
+      {/* 成員列 */}
       <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar pb-2">
         <button
           onClick={() => setViewMode('summary')}
@@ -344,7 +362,15 @@ export const PreparationPage = () => {
                 <h2 className="font-black text-[#5E5340] text-lg">
                   {currentMember} 的{activeTab === 'packing' ? '行李' : '清單'}
                 </h2>
-                <span className="text-[#3AA986] font-black font-mono text-2xl">{calculateProgress(currentMember)}%</span>
+                <div className="flex items-center space-x-2">
+                  {/* 顯示匯率提示 */}
+                  {activeTab === 'shopping' && (
+                    <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                      匯率: {exchangeRate}
+                    </span>
+                  )}
+                  <span className="text-[#3AA986] font-black font-mono text-2xl">{calculateProgress(currentMember)}%</span>
+                </div>
              </div>
              <div className="h-4 bg-[#F2F4E7] rounded-full overflow-hidden">
                 <div 
@@ -356,7 +382,6 @@ export const PreparationPage = () => {
 
           <div className="space-y-6">
             {currentCategories.map(cat => {
-              // ▼▼▼ 過濾邏輯：購物清單只顯示自己的物品 ▼▼▼
               const visibleItems = activeTab === 'shopping' 
                 ? cat.items.filter(item => item.owner === currentMember)
                 : cat.items;
@@ -379,37 +404,117 @@ export const PreparationPage = () => {
                   <div className="p-4 pt-2 space-y-2">
                      {visibleItems.map(item => {
                        const isChecked = item.checkedBy.includes(currentMember);
+                       const isPricing = pricingItemId === item.id;
+                       
+                       // 計算價差
+                       const jpPriceInTwd = (item.jpPrice || 0) * exchangeRate;
+                       const priceDiff = (item.twPrice || 0) - jpPriceInTwd;
+                       const hasPriceData = item.twPrice && item.jpPrice;
+
                        return (
-                         <div key={item.id} className="flex items-center group">
-                            <button 
-                              onClick={() => toggleCheck(cat.id, item.id)}
-                              className={`w-6 h-6 rounded-lg border-2 mr-3 flex items-center justify-center transition-all flex-shrink-0
-                                ${isChecked 
-                                  ? 'bg-[#3AA986] border-[#3AA986] text-white' 
-                                  : 'border-gray-300 text-transparent hover:border-[#3AA986]'}`}
-                            >
-                              <FontAwesomeIcon icon={faCheck} className="text-sm" />
-                            </button>
-                            
-                            <span className={`flex-1 font-bold transition-all ${isChecked ? 'text-gray-300 line-through' : 'text-[#5E5340]'}`}>
-                              {item.text}
-                            </span>
+                         <div key={item.id} className="group flex flex-col border-b border-dashed border-gray-100 last:border-0 pb-2 mb-2">
+                           <div className="flex items-center">
+                              <button 
+                                onClick={() => toggleCheck(cat.id, item.id)}
+                                className={`w-6 h-6 rounded-lg border-2 mr-3 flex items-center justify-center transition-all flex-shrink-0
+                                  ${isChecked 
+                                    ? 'bg-[#3AA986] border-[#3AA986] text-white' 
+                                    : 'border-gray-300 text-transparent hover:border-[#3AA986]'}`}
+                              >
+                                <FontAwesomeIcon icon={faCheck} className="text-sm" />
+                              </button>
+                              
+                              <div className="flex-1">
+                                <span className={`font-bold transition-all ${isChecked ? 'text-gray-300 line-through' : 'text-[#5E5340]'}`}>
+                                  {item.text}
+                                </span>
+                                {/* 顯示簡易價差結果 */}
+                                {hasPriceData && !isPricing && (
+                                  <div className="flex items-center text-[10px] font-bold mt-0.5 space-x-2">
+                                    <span className="text-gray-400">台 ${item.twPrice}</span>
+                                    <span className="text-gray-300">|</span>
+                                    <span className="text-gray-400">日 ¥{item.jpPrice}</span>
+                                    <span className="text-gray-300">→</span>
+                                    <span className={priceDiff > 0 ? 'text-green-500' : 'text-red-400'}>
+                                      {priceDiff > 0 ? `省 ${Math.round(priceDiff)}` : `貴 ${Math.round(Math.abs(priceDiff))}`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
 
-                            {/* ▼▼▼ 自動查價按鈕 (Google 搜尋) ▼▼▼ */}
-                            {activeTab === 'shopping' && (
-                               <button 
-                                 onClick={() => handlePriceCheck(item.text)}
-                                 className="text-orange-400 bg-orange-50 px-2 py-1 rounded-lg text-[10px] font-bold mr-2 hover:bg-orange-100 transition-colors flex items-center whitespace-nowrap"
-                                 title="Google 智慧比價"
-                               >
-                                 <FontAwesomeIcon icon={faMagnifyingGlassDollar} className="mr-1" />
-                                 查價
-                               </button>
-                            )}
+                              {/* 購物模式下：開啟比價按鈕 */}
+                              {activeTab === 'shopping' && (
+                                 <button 
+                                   onClick={() => setPricingItemId(isPricing ? null : item.id)}
+                                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors mr-1
+                                     ${hasPriceData 
+                                        ? (priceDiff > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500')
+                                        : 'bg-orange-50 text-orange-400 hover:bg-orange-100'}`}
+                                 >
+                                   {isPricing ? <FontAwesomeIcon icon={faXmark} /> : <FontAwesomeIcon icon={faCalculator} />}
+                                 </button>
+                              )}
 
-                            <button onClick={() => deleteItem(cat.id, item.id)} className="text-gray-200 hover:text-red-300 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <FontAwesomeIcon icon={faTrashCan} className="text-xs" />
-                            </button>
+                              <button onClick={() => deleteItem(cat.id, item.id)} className="text-gray-200 hover:text-red-300 p-2">
+                                <FontAwesomeIcon icon={faTrashCan} className="text-xs" />
+                              </button>
+                           </div>
+
+                           {/* ▼▼▼ 比價輸入面板 (展開) ▼▼▼ */}
+                           {isPricing && (
+                             <div className="mt-2 bg-[#FFFAFA] border-2 border-[#F2F4E7] rounded-xl p-3 animate-fade-in">
+                               <div className="grid grid-cols-2 gap-3 mb-2">
+                                 <div>
+                                   <div className="flex justify-between items-center mb-1">
+                                     <label className="text-[10px] font-bold text-gray-400">台灣價格 (NT$)</label>
+                                     <button onClick={() => searchPrice(item.text, 'TW')} className="text-[10px] text-blue-400 hover:underline">
+                                       <FontAwesomeIcon icon={faMagnifyingGlassDollar} className="mr-1"/>查價
+                                     </button>
+                                   </div>
+                                   <input 
+                                     type="number" 
+                                     value={item.twPrice || ''} 
+                                     onChange={(e) => updatePrice(cat.id, item.id, 'twPrice', e.target.value)}
+                                     className="w-full bg-white border-2 border-gray-100 rounded-lg px-2 py-1 text-sm font-bold text-[#5E5340] outline-none focus:border-orange-200"
+                                     placeholder="0"
+                                   />
+                                 </div>
+                                 <div>
+                                   <div className="flex justify-between items-center mb-1">
+                                     <label className="text-[10px] font-bold text-gray-400">日本價格 (JPY)</label>
+                                     <button onClick={() => searchPrice(item.text, 'JP')} className="text-[10px] text-blue-400 hover:underline">
+                                       <FontAwesomeIcon icon={faMagnifyingGlassDollar} className="mr-1"/>查價
+                                     </button>
+                                   </div>
+                                   <input 
+                                     type="number" 
+                                     value={item.jpPrice || ''} 
+                                     onChange={(e) => updatePrice(cat.id, item.id, 'jpPrice', e.target.value)}
+                                     className="w-full bg-white border-2 border-gray-100 rounded-lg px-2 py-1 text-sm font-bold text-[#5E5340] outline-none focus:border-orange-200"
+                                     placeholder="0"
+                                   />
+                                 </div>
+                               </div>
+                               
+                               {/* 比價結果顯示 */}
+                               {hasPriceData ? (
+                                 <div className={`text-center py-2 rounded-lg font-bold text-sm flex items-center justify-center space-x-2
+                                   ${priceDiff > 0 ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>
+                                   <FontAwesomeIcon icon={faArrowRightArrowLeft} className="text-xs opacity-50" />
+                                   <span>
+                                     {priceDiff > 0 
+                                       ? `在日本買現省 NT$ ${Math.round(priceDiff)}！` 
+                                       : `注意！台灣買便宜 NT$ ${Math.round(Math.abs(priceDiff))}`}
+                                   </span>
+                                 </div>
+                               ) : (
+                                 <div className="text-center text-[10px] text-gray-400 py-1">
+                                   輸入兩地價格，自動幫你算價差
+                                 </div>
+                               )}
+                             </div>
+                           )}
+                           {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
                          </div>
                        );
                      })}
