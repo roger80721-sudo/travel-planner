@@ -1,78 +1,92 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faCloudArrowDown } from '@fortawesome/free-solid-svg-icons';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 
 import { BookingCard, type BookingItem } from './components/BookingCard';
 import { AddBookingForm } from './components/AddBookingForm';
 import { Modal } from '../../components/ui/Modal';
+import { loadFromCloud, saveToCloud } from '../../utils/supabase'; // 引入雲端工具
 
+// 預設資料 (只有在雲端完全沒資料時才會顯示)
 const INITIAL_BOOKINGS: BookingItem[] = [
   { 
     id: '1', type: 'flight', title: 'JX820', provider: '星宇航空', 
     date: '2025-02-27', time: '08:30', reference: '6XK9P2', link: 'https://www.starlux-airlines.com',
     departCode: 'TPE', departName: '桃園機場', arriveCode: 'KIX', arriveName: '關西機場', baggage: '23kg'
-  },
-  { 
-    id: '2', 
-    type: 'hotel', 
-    title: '大阪梅田大和魯內酒店', 
-    provider: 'Agoda', 
-    date: '2025-02-27', 
-    time: '15:00', 
-    reference: 'HB-29384',
-    // 新增：示範用旅館圖片 URL
-    imageUrl: 'https://cf.bstatic.com/xdata/images/hotel/max1024x768/485658494.jpg?k=4230400267510420180163839153173817303037365240238886336101501342&o=&hp=1'
   }
 ];
 
 export const BookingsPage = () => {
-  const [bookings, setBookings] = useState<BookingItem[]>(() => {
-    const saved = localStorage.getItem('travel-bookings-data');
-    return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-  });
+  const [bookings, setBookings] = useState<BookingItem[]>(INITIAL_BOOKINGS);
+  const [isLoading, setIsLoading] = useState(true); // 讀取狀態
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BookingItem | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'flight' | 'hotel'>('all');
 
+  // ▼▼▼ 1. 初始化：從雲端載入 ▼▼▼
   useEffect(() => {
-    localStorage.setItem('travel-bookings-data', JSON.stringify(bookings));
-  }, [bookings]);
+    const initData = async () => {
+      setIsLoading(true);
+      const cloudData = await loadFromCloud('travel-bookings-data');
+      if (cloudData) {
+        setBookings(cloudData);
+      }
+      setIsLoading(false);
+    };
+    initData();
+  }, []);
+
+  // ▼▼▼ 2. 儲存輔助函式 ▼▼▼
+  const saveAllToCloud = (newData: BookingItem[]) => {
+    setBookings(newData);
+    saveToCloud('travel-bookings-data', newData);
+  };
 
   const handleSave = (formData: Omit<BookingItem, 'id'>) => {
+    let newBookings;
     if (editingItem) {
-      setBookings(prev => prev.map(item => item.id === editingItem.id ? { ...formData, id: item.id } : item));
+      newBookings = bookings.map(item => item.id === editingItem.id ? { ...formData, id: item.id } : item);
     } else {
-      setBookings(prev => [...prev, { ...formData, id: Date.now().toString() }]);
+      newBookings = [...bookings, { ...formData, id: Date.now().toString() }];
     }
+    saveAllToCloud(newBookings); // 存到雲端
     setIsModalOpen(false);
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm('確定要刪除這筆預訂嗎？')) {
-      setBookings(prev => prev.filter(item => item.id !== id));
+      const newBookings = bookings.filter(item => item.id !== id);
+      saveAllToCloud(newBookings); // 存到雲端
     }
   };
 
-  // 拖拉排序邏輯
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const sourceIndex = result.source.index;
     const destinationIndex = result.destination.index;
     if (sourceIndex === destinationIndex) return;
 
-    setBookings(prev => {
-      const newItems = Array.from(prev);
-      const [reorderedItem] = newItems.splice(sourceIndex, 1);
-      newItems.splice(destinationIndex, 0, reorderedItem);
-      return newItems;
-    });
+    const newItems = Array.from(bookings);
+    const [reorderedItem] = newItems.splice(sourceIndex, 1);
+    newItems.splice(destinationIndex, 0, reorderedItem);
+    
+    saveAllToCloud(newItems); // 存到雲端
   };
 
   const filteredBookings = filterType === 'all' 
     ? bookings 
     : bookings.filter(b => b.type === filterType);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-[#8DD2BA]">
+        <FontAwesomeIcon icon={faCloudArrowDown} className="text-4xl animate-bounce mb-2" />
+        <p className="font-bold">正在從雲端載入預訂...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-24 px-4 pt-4">
