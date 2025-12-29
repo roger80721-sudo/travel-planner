@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faUserGroup, faTrashCan, faCoins, faArrowsRotate, 
-  faCloudArrowDown, faPalette, faChartPie, faList
+  faCloudArrowDown, faPalette, faChartPie, faList, faMoneyBillTransfer, faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 import { ExpenseCard, type ExpenseItem } from './components/ExpenseCard';
 import { AddExpenseForm } from './components/AddExpenseForm';
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
-// 分類設定 (用於分析頁面)
+// 分類設定
 const CAT_LABELS: Record<string, string> = {
   food: '飲食', traffic: '交通', shopping: '購物', hotel: '住宿', activity: '玩樂', other: '其他'
 };
@@ -35,11 +35,11 @@ export const ExpensePage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  
-  // 新增：個人詳細分析 Modal
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  // 新增：結算 Modal
+  const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
+  
   const [viewingMember, setViewingMember] = useState<string | null>(null);
-
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   
   const [newMemberName, setNewMemberName] = useState('');
@@ -129,6 +129,61 @@ export const ExpensePage = () => {
   };
   const summary = calculateSummary();
 
+  // ▼▼▼ 核心演算法：計算結算路徑 ▼▼▼
+  const calculateSettlements = () => {
+    // 1. 計算每個人的淨餘額 (正 = 應收, 負 = 應付)
+    const balances: Record<string, number> = {};
+    members.forEach(m => {
+      // 淨餘額 = 已付總額 - 應付總額
+      balances[m] = (summary[m]?.paid || 0) - (summary[m]?.consumed || 0);
+    });
+
+    // 2. 分類為「債務人(欠錢)」與「債權人(收錢)」
+    let debtors: { name: string; amount: number }[] = [];
+    let creditors: { name: string; amount: number }[] = [];
+
+    Object.entries(balances).forEach(([name, amount]) => {
+      if (amount < -1) debtors.push({ name, amount }); // 忽略極小誤差
+      else if (amount > 1) creditors.push({ name, amount });
+    });
+
+    // 排序：金額大的優先處理 (貪婪演算法)
+    debtors.sort((a, b) => a.amount - b.amount); // 負越多的排前面
+    creditors.sort((a, b) => b.amount - a.amount); // 正越多的排前面
+
+    const transactions: { from: string; to: string; amount: number }[] = [];
+
+    // 3. 雙指針配對
+    let i = 0; // debtor index
+    let j = 0; // creditor index
+
+    while (i < debtors.length && j < creditors.length) {
+      const debtor = debtors[i];
+      const creditor = creditors[j];
+
+      // 取兩者絕對值的最小值 (能還多少就還多少)
+      const amount = Math.min(Math.abs(debtor.amount), creditor.amount);
+      
+      transactions.push({
+        from: debtor.name,
+        to: creditor.name,
+        amount: Math.round(amount)
+      });
+
+      // 更新餘額
+      debtor.amount += amount;
+      creditor.amount -= amount;
+
+      // 如果債務人還清了，換下一個
+      if (Math.abs(debtor.amount) < 1) i++;
+      // 如果債權人收滿了，換下一個
+      if (creditor.amount < 1) j++;
+    }
+
+    return { balances, transactions };
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
   const handleSave = (data: Omit<ExpenseItem, 'id'>) => {
     let newExpenses;
     if (editingItem) {
@@ -152,7 +207,6 @@ export const ExpensePage = () => {
     if (name && !members.includes(name)) {
       const newMembers = [...members, name];
       const newColors = { ...memberColors, [name]: newMemberColor };
-      
       saveMembersToCloud(newMembers, newColors);
       setNewMemberName('');
       const nextColorIndex = (COLOR_PALETTE.indexOf(newMemberColor) + 1) % COLOR_PALETTE.length;
@@ -170,20 +224,15 @@ export const ExpensePage = () => {
     }
   };
 
-  // 取得特定成員的「代墊」詳細資料 (分類統計)
   const getMemberDetails = (member: string) => {
-    // 找出該成員 "先付" (代墊) 的所有項目
     const paidItems = expenses.filter(e => e.payer === member);
     const totalPaid = paidItems.reduce((sum, item) => sum + (item.currency === 'JPY' ? item.amount * exchangeRate : item.amount), 0);
-    
-    // 依分類統計
     const categoryStats: Record<string, number> = {};
     paidItems.forEach(item => {
       const cat = item.category || 'other';
       const val = item.currency === 'JPY' ? item.amount * exchangeRate : item.amount;
       categoryStats[cat] = (categoryStats[cat] || 0) + val;
     });
-
     return { paidItems, totalPaid, categoryStats };
   };
 
@@ -235,12 +284,22 @@ export const ExpensePage = () => {
              </div>
            </div>
            
-           <button 
-             onClick={() => setIsMemberModalOpen(true)}
-             className="bg-white/20 hover:bg-white/30 p-2 rounded-xl backdrop-blur-sm transition-colors"
-           >
-             <FontAwesomeIcon icon={faUserGroup} />
-           </button>
+           <div className="flex flex-col space-y-2">
+             <button 
+               onClick={() => setIsMemberModalOpen(true)}
+               className="bg-white/20 hover:bg-white/30 p-2 rounded-xl backdrop-blur-sm transition-colors"
+             >
+               <FontAwesomeIcon icon={faUserGroup} />
+             </button>
+             {/* ▼▼▼ 結算按鈕 ▼▼▼ */}
+             <button 
+               onClick={() => setIsSettlementModalOpen(true)}
+               className="bg-orange-400 hover:bg-orange-500 text-white p-2 rounded-xl shadow-lg transition-colors flex items-center justify-center"
+               title="結算建議"
+             >
+               <FontAwesomeIcon icon={faMoneyBillTransfer} />
+             </button>
+           </div>
         </div>
         
         <div className="mt-6 pt-4 border-t border-white/20">
@@ -304,13 +363,7 @@ export const ExpensePage = () => {
           </div>
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
-               <input 
-                 type="text" 
-                 value={newMemberName} 
-                 onChange={e => setNewMemberName(e.target.value)} 
-                 placeholder="輸入名字" 
-                 className="flex-1 input-style" 
-               />
+               <input type="text" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="輸入名字" className="flex-1 input-style" />
                <button onClick={addMember} className="bg-[#5C4033] text-white px-4 py-2 rounded-xl font-bold whitespace-nowrap">新增</button>
             </div>
             <div className="flex items-center space-x-2 overflow-x-auto pb-1">
@@ -340,24 +393,19 @@ export const ExpensePage = () => {
         </div>
       </Modal>
 
-      {/* ▼▼▼ 新增：個人詳細花費分析 Modal ▼▼▼ */}
+      {/* 個人詳細分析 Modal */}
       {viewingMember && (
         <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title={`${viewingMember} 的代墊分析`}>
           {(() => {
             const { paidItems, totalPaid, categoryStats } = getMemberDetails(viewingMember);
             return (
               <div className="space-y-6">
-                {/* 總金額 */}
                 <div className="text-center">
                   <div className="text-xs text-gray-400 font-bold mb-1">總代墊金額 (NT$)</div>
                   <div className="text-4xl font-black text-[#5E5340] font-mono">{Math.round(totalPaid).toLocaleString()}</div>
                 </div>
-
-                {/* 分類統計條 */}
                 <div>
-                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center">
-                    <FontAwesomeIcon icon={faChartPie} className="mr-2" /> 分類統計
-                  </h4>
+                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center"><FontAwesomeIcon icon={faChartPie} className="mr-2" /> 分類統計</h4>
                   <div className="space-y-2">
                     {Object.entries(categoryStats).map(([cat, amount]) => {
                       const percent = (amount / totalPaid) * 100;
@@ -365,10 +413,7 @@ export const ExpensePage = () => {
                         <div key={cat} className="flex items-center space-x-2">
                           <div className="w-20 text-xs font-bold text-gray-500 text-right">{CAT_LABELS[cat]}</div>
                           <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full transition-all duration-500" 
-                              style={{ width: `${percent}%`, backgroundColor: CAT_COLORS[cat] || '#ccc' }} 
-                            />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: CAT_COLORS[cat] || '#ccc' }} />
                           </div>
                           <div className="w-16 text-xs font-mono font-bold text-right">${Math.round(amount).toLocaleString()}</div>
                         </div>
@@ -376,28 +421,20 @@ export const ExpensePage = () => {
                     })}
                   </div>
                 </div>
-
-                {/* 詳細列表 */}
                 <div>
-                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center">
-                    <FontAwesomeIcon icon={faList} className="mr-2" /> 帳目明細
-                  </h4>
+                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center"><FontAwesomeIcon icon={faList} className="mr-2" /> 帳目明細</h4>
                   <div className="space-y-2 max-h-[40vh] overflow-y-auto bg-gray-50 p-2 rounded-xl">
-                    {paidItems.length === 0 ? (
-                      <div className="text-center text-xs text-gray-400 py-4">沒有資料</div>
-                    ) : (
+                    {paidItems.length === 0 ? <div className="text-center text-xs text-gray-400 py-4">沒有資料</div> : 
                       paidItems.map(item => (
                         <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-100 flex justify-between items-center text-sm">
                           <div className="flex items-center space-x-2">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CAT_COLORS[item.category || 'other'] }} />
                             <span className="font-bold text-gray-700">{item.item}</span>
                           </div>
-                          <div className="font-mono font-bold text-gray-500">
-                            {item.currency === 'JPY' ? `¥${item.amount}` : `$${item.amount}`}
-                          </div>
+                          <div className="font-mono font-bold text-gray-500">{item.currency === 'JPY' ? `¥${item.amount}` : `$${item.amount}`}</div>
                         </div>
                       ))
-                    )}
+                    }
                   </div>
                 </div>
               </div>
@@ -405,7 +442,84 @@ export const ExpensePage = () => {
           })()}
         </Modal>
       )}
-      {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+
+      {/* ▼▼▼ 結算建議 Modal ▼▼▼ */}
+      <Modal isOpen={isSettlementModalOpen} onClose={() => setIsSettlementModalOpen(false)} title="💰 結算建議 (NT$)">
+        {(() => {
+          const { balances, transactions } = calculateSettlements();
+          return (
+            <div className="space-y-6">
+              {/* 1. 收支一覽 (長條圖) */}
+              <div>
+                <h4 className="text-sm font-bold text-gray-500 mb-3 flex items-center">
+                  <FontAwesomeIcon icon={faList} className="mr-2" /> 目前收支一覽
+                </h4>
+                <div className="space-y-3">
+                  {Object.entries(balances).map(([member, amount]) => {
+                    const isPositive = amount > 0;
+                    return (
+                      <div key={member} className="flex items-center text-xs font-bold">
+                        <div className="w-16 text-right mr-2 text-gray-600">{member}</div>
+                        <div className="flex-1 h-6 bg-gray-100 rounded-md relative flex items-center">
+                          {/* 0 的中線 */}
+                          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-gray-300 z-10"></div>
+                          
+                          {/* 負值條 (向左) */}
+                          {!isPositive && (
+                            <div 
+                              className="absolute right-1/2 top-1 bottom-1 bg-red-400 rounded-l-sm transition-all" 
+                              style={{ width: `${Math.min(Math.abs(amount) / 2000 * 50, 50)}%` }} // 簡單縮放，假設2000是長條極限
+                            />
+                          )}
+                          
+                          {/* 正值條 (向右) */}
+                          {isPositive && (
+                            <div 
+                              className="absolute left-1/2 top-1 bottom-1 bg-green-400 rounded-r-sm transition-all" 
+                              style={{ width: `${Math.min(amount / 2000 * 50, 50)}%` }}
+                            />
+                          )}
+                        </div>
+                        <div className={`w-20 text-right ml-2 font-mono ${isPositive ? 'text-green-600' : amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                          {amount > 0 ? '+' : ''}{Math.round(amount)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-2">
+                  <span className="text-green-500">綠色</span> = 應收 (多付了) / <span className="text-red-500">紅色</span> = 應付 (少付了)
+                </p>
+              </div>
+
+              {/* 2. 轉帳建議 */}
+              <div className="bg-[#FFF8E1] border-2 border-[#FFE0B2] rounded-2xl p-4">
+                <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center">
+                  <FontAwesomeIcon icon={faMoneyBillTransfer} className="mr-2" /> 最佳轉帳路徑
+                </h4>
+                {transactions.length === 0 ? (
+                  <div className="text-center text-gray-400 font-bold py-2">🎉 帳目已平衡，不需要轉帳！</div>
+                ) : (
+                  <div className="space-y-3">
+                    {transactions.map((t, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-black text-gray-600">{t.from}</span>
+                          <FontAwesomeIcon icon={faArrowRight} className="text-orange-300 text-xs" />
+                          <span className="font-black text-gray-600">{t.to}</span>
+                        </div>
+                        <div className="font-black text-orange-600 font-mono text-lg">
+                          ${t.amount.toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
 
       <style>{`
         .input-style { background: white; border: 2px solid #F3F4F6; border-radius: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; color: #5E5340; outline: none; }
