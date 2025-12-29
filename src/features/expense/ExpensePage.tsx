@@ -2,23 +2,23 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faUserGroup, faTrashCan, faCoins, faArrowsRotate, 
-  faCloudArrowDown, faPalette 
+  faCloudArrowDown, faPalette, faChartPie, faList
 } from '@fortawesome/free-solid-svg-icons';
 import { ExpenseCard, type ExpenseItem } from './components/ExpenseCard';
 import { AddExpenseForm } from './components/AddExpenseForm';
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
-// 動森風格色票
+// 分類設定 (用於分析頁面)
+const CAT_LABELS: Record<string, string> = {
+  food: '飲食', traffic: '交通', shopping: '購物', hotel: '住宿', activity: '玩樂', other: '其他'
+};
+const CAT_COLORS: Record<string, string> = {
+  food: '#F97316', traffic: '#3B82F6', shopping: '#EC4899', hotel: '#6366F1', activity: '#22C55E', other: '#6B7280'
+};
+
 const COLOR_PALETTE = [
-  '#F3A76C', // 橘
-  '#7CAFC4', // 藍
-  '#F5E050', // 黃
-  '#96E0C5', // 綠
-  '#F48FB1', // 粉
-  '#9575CD', // 紫
-  '#4DB6AC', // 青
-  '#BCAAA4', // 灰
+  '#F3A76C', '#7CAFC4', '#F5E050', '#96E0C5', '#F48FB1', '#9575CD', '#4DB6AC', '#BCAAA4'
 ];
 
 const INITIAL_MEMBERS = ['我', '旅伴 A'];
@@ -26,9 +26,7 @@ const INITIAL_EXPENSES: ExpenseItem[] = [];
 
 export const ExpensePage = () => {
   const [members, setMembers] = useState<string[]>(INITIAL_MEMBERS);
-  // 新增：成員顏色對照表 { "我": "#F3A76C", ... }
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
-  
   const [expenses, setExpenses] = useState<ExpenseItem[]>(INITIAL_EXPENSES);
   const [exchangeRate, setExchangeRate] = useState<number>(0.22);
   
@@ -37,9 +35,13 @@ export const ExpensePage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  
+  // 新增：個人詳細分析 Modal
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [viewingMember, setViewingMember] = useState<string | null>(null);
+
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   
-  // 新增成員表單狀態
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberColor, setNewMemberColor] = useState(COLOR_PALETTE[0]);
 
@@ -50,12 +52,10 @@ export const ExpensePage = () => {
       const cloudMembers = await loadFromCloud('travel-members');
       if (cloudMembers) setMembers(cloudMembers);
 
-      // 載入顏色
       const cloudColors = await loadFromCloud('travel-member-colors');
       if (cloudColors) {
         setMemberColors(cloudColors);
       } else {
-        // 如果雲端沒顏色資料，給現有成員隨機上色
         const defaultColors: Record<string, string> = {};
         (cloudMembers || INITIAL_MEMBERS).forEach((m: string, index: number) => {
           defaultColors[m] = COLOR_PALETTE[index % COLOR_PALETTE.length];
@@ -79,7 +79,6 @@ export const ExpensePage = () => {
     saveToCloud('travel-expenses-data', newData);
   };
   
-  // 儲存成員與顏色
   const saveMembersToCloud = (newMembers: string[], newColors: Record<string, string>) => {
     setMembers(newMembers);
     setMemberColors(newColors);
@@ -156,7 +155,6 @@ export const ExpensePage = () => {
       
       saveMembersToCloud(newMembers, newColors);
       setNewMemberName('');
-      // 自動切換到下一個顏色
       const nextColorIndex = (COLOR_PALETTE.indexOf(newMemberColor) + 1) % COLOR_PALETTE.length;
       setNewMemberColor(COLOR_PALETTE[nextColorIndex]);
     }
@@ -166,12 +164,32 @@ export const ExpensePage = () => {
     if (members.length <= 1) return alert('至少要有一個人喔！');
     if (confirm(`刪除成員「${name}」可能會影響已存在的帳目計算，確定嗎？`)) {
       const newMembers = members.filter(m => m !== name);
-      // 顏色不用特別刪，留著也沒關係，或是刪除也可以
       const newColors = { ...memberColors };
       delete newColors[name];
-      
       saveMembersToCloud(newMembers, newColors);
     }
+  };
+
+  // 取得特定成員的「代墊」詳細資料 (分類統計)
+  const getMemberDetails = (member: string) => {
+    // 找出該成員 "先付" (代墊) 的所有項目
+    const paidItems = expenses.filter(e => e.payer === member);
+    const totalPaid = paidItems.reduce((sum, item) => sum + (item.currency === 'JPY' ? item.amount * exchangeRate : item.amount), 0);
+    
+    // 依分類統計
+    const categoryStats: Record<string, number> = {};
+    paidItems.forEach(item => {
+      const cat = item.category || 'other';
+      const val = item.currency === 'JPY' ? item.amount * exchangeRate : item.amount;
+      categoryStats[cat] = (categoryStats[cat] || 0) + val;
+    });
+
+    return { paidItems, totalPaid, categoryStats };
+  };
+
+  const openMemberDetail = (member: string) => {
+    setViewingMember(member);
+    setIsDetailModalOpen(true);
   };
 
   const totalAmountTWD = expenses.reduce((sum, item) => {
@@ -226,10 +244,14 @@ export const ExpensePage = () => {
         </div>
         
         <div className="mt-6 pt-4 border-t border-white/20">
+          <p className="text-[10px] opacity-60 mb-2 font-bold">點擊頭像查看詳細分類 👇</p>
           <div className="flex space-x-4 overflow-x-auto no-scrollbar pb-2">
             {members.map(m => (
-              <div key={m} className="flex-shrink-0 flex items-center space-x-2 bg-black/10 px-3 py-1.5 rounded-xl">
-                {/* 顯示成員顏色頭像 */}
+              <div 
+                key={m} 
+                onClick={() => openMemberDetail(m)}
+                className="flex-shrink-0 flex items-center space-x-2 bg-black/10 px-3 py-1.5 rounded-xl cursor-pointer hover:bg-black/20 transition-colors"
+              >
                 <div 
                   className="w-6 h-6 rounded-full border-2 border-white/50 shadow-sm"
                   style={{ backgroundColor: memberColors[m] || '#fff' }}
@@ -250,11 +272,16 @@ export const ExpensePage = () => {
             key={item.id} 
             item={item} 
             exchangeRate={exchangeRate}
-            memberColors={memberColors} // 傳入顏色表
+            memberColors={memberColors} 
             onEdit={(item) => { setEditingItem(item); setIsModalOpen(true); }}
             onDelete={handleDelete}
           />
         ))}
+        {expenses.length === 0 && (
+          <div className="text-center py-10 text-gray-400 font-bold opacity-50">
+            還沒有記帳喔！按右下角 + 新增
+          </div>
+        )}
       </div>
 
       <button 
@@ -264,6 +291,7 @@ export const ExpensePage = () => {
         <FontAwesomeIcon icon={faPlus} />
       </button>
 
+      {/* 新增/編輯 Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "編輯帳目" : "新增帳目"}>
         <AddExpenseForm initialData={editingItem} members={members} onSubmit={handleSave} onCancel={() => setIsModalOpen(false)} />
       </Modal>
@@ -274,8 +302,6 @@ export const ExpensePage = () => {
           <div className="bg-orange-50 p-3 rounded-xl text-xs text-[#5C4033]">
              💡 為每位成員設定一個代表色，分帳時更清楚喔！
           </div>
-          
-          {/* 新增成員區塊 */}
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
                <input 
@@ -285,12 +311,8 @@ export const ExpensePage = () => {
                  placeholder="輸入名字" 
                  className="flex-1 input-style" 
                />
-               <button onClick={addMember} className="bg-[#5C4033] text-white px-4 py-2 rounded-xl font-bold whitespace-nowrap">
-                 新增
-               </button>
+               <button onClick={addMember} className="bg-[#5C4033] text-white px-4 py-2 rounded-xl font-bold whitespace-nowrap">新增</button>
             </div>
-            
-            {/* 顏色選擇器 */}
             <div className="flex items-center space-x-2 overflow-x-auto pb-1">
                <span className="text-xs font-bold text-gray-400 whitespace-nowrap"><FontAwesomeIcon icon={faPalette} /> 代表色：</span>
                {COLOR_PALETTE.map(color => (
@@ -303,28 +325,87 @@ export const ExpensePage = () => {
                ))}
             </div>
           </div>
-
           <div className="border-t border-dashed border-gray-200 my-2" />
-
-          {/* 成員列表 */}
           <div className="space-y-2 max-h-[50vh] overflow-y-auto">
             {members.map(m => (
               <div key={m} className="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-xl">
                 <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm"
-                    style={{ backgroundColor: memberColors[m] || '#eee' }}
-                  />
+                  <div className="w-8 h-8 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: memberColors[m] || '#eee' }} />
                   <span className="font-bold text-gray-700">{m}</span>
                 </div>
-                <button onClick={() => removeMember(m)} className="text-gray-300 hover:text-red-400 p-2">
-                  <FontAwesomeIcon icon={faTrashCan} />
-                </button>
+                <button onClick={() => removeMember(m)} className="text-gray-300 hover:text-red-400 p-2"><FontAwesomeIcon icon={faTrashCan} /></button>
               </div>
             ))}
           </div>
         </div>
       </Modal>
+
+      {/* ▼▼▼ 新增：個人詳細花費分析 Modal ▼▼▼ */}
+      {viewingMember && (
+        <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title={`${viewingMember} 的代墊分析`}>
+          {(() => {
+            const { paidItems, totalPaid, categoryStats } = getMemberDetails(viewingMember);
+            return (
+              <div className="space-y-6">
+                {/* 總金額 */}
+                <div className="text-center">
+                  <div className="text-xs text-gray-400 font-bold mb-1">總代墊金額 (NT$)</div>
+                  <div className="text-4xl font-black text-[#5E5340] font-mono">{Math.round(totalPaid).toLocaleString()}</div>
+                </div>
+
+                {/* 分類統計條 */}
+                <div>
+                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center">
+                    <FontAwesomeIcon icon={faChartPie} className="mr-2" /> 分類統計
+                  </h4>
+                  <div className="space-y-2">
+                    {Object.entries(categoryStats).map(([cat, amount]) => {
+                      const percent = (amount / totalPaid) * 100;
+                      return (
+                        <div key={cat} className="flex items-center space-x-2">
+                          <div className="w-20 text-xs font-bold text-gray-500 text-right">{CAT_LABELS[cat]}</div>
+                          <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${percent}%`, backgroundColor: CAT_COLORS[cat] || '#ccc' }} 
+                            />
+                          </div>
+                          <div className="w-16 text-xs font-mono font-bold text-right">${Math.round(amount).toLocaleString()}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 詳細列表 */}
+                <div>
+                  <h4 className="text-sm font-bold text-gray-500 mb-2 flex items-center">
+                    <FontAwesomeIcon icon={faList} className="mr-2" /> 帳目明細
+                  </h4>
+                  <div className="space-y-2 max-h-[40vh] overflow-y-auto bg-gray-50 p-2 rounded-xl">
+                    {paidItems.length === 0 ? (
+                      <div className="text-center text-xs text-gray-400 py-4">沒有資料</div>
+                    ) : (
+                      paidItems.map(item => (
+                        <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-100 flex justify-between items-center text-sm">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CAT_COLORS[item.category || 'other'] }} />
+                            <span className="font-bold text-gray-700">{item.item}</span>
+                          </div>
+                          <div className="font-mono font-bold text-gray-500">
+                            {item.currency === 'JPY' ? `¥${item.amount}` : `$${item.amount}`}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
+      {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
 
       <style>{`
         .input-style { background: white; border: 2px solid #F3F4F6; border-radius: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; color: #5E5340; outline: none; }
