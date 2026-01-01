@@ -1,72 +1,72 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// ▼▼▼ 修正：移除了沒用到的 faCloudArrowDown ▼▼▼
-import { faDownload, faUpload, faTriangleExclamation, faCheckCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faCloudArrowUp, faCloudArrowDown, faTriangleExclamation, faFileImport, faFileExport 
+} from '@fortawesome/free-solid-svg-icons';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
+// 定義我們要備份的所有資料 Key
+const DATA_KEYS = [
+  'travel-planner-data',    // 行李
+  'travel-shopping-data',   // 待買清單
+  'travel-bookings-data',   // 預訂
+  'travel-expenses-data',   // 記帳
+  'travel-members',         // 成員
+  'travel-member-colors',   // 成員顏色
+  'travel-exchange-rate',   // 匯率
+  'travel-trip-title'       // 標題
+];
+
 export const SettingsPage = () => {
-  const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 定義所有要備份的 Key
-  const STORAGE_KEYS = [
-    'travel-planner-data',
-    'travel-bookings-data',
-    'travel-expenses-data',
-    'travel-budget',
-    'travel-exchange-rate',
-    'travel-journal-data',
-    'travel-trip-title',
-    'travel-members'
-  ];
-
-  // 1. 雲端匯出功能
+  // 📤 匯出備份 (下載到手機)
   const handleExport = async () => {
     setIsLoading(true);
-    setMessage('');
-    
     try {
-      const data: Record<string, any> = {};
+      const backupData: Record<string, any> = {};
       
-      for (const key of STORAGE_KEYS) {
-        const value = await loadFromCloud(key);
-        if (value) {
-          data[key] = value;
+      // 1. 從雲端抓取所有最新資料
+      for (const key of DATA_KEYS) {
+        const data = await loadFromCloud(key);
+        if (data) {
+          backupData[key] = data;
         }
       }
 
-      if (Object.keys(data).length === 0) {
-        alert('雲端目前沒有任何資料可以備份喔！');
-        setIsLoading(false);
-        return;
-      }
+      // 2. 加上備份時間戳記
+      backupData['_backup_date'] = new Date().toISOString();
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      // 3. 轉成 Blob 並下載
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
+      
       const a = document.createElement('a');
       a.href = url;
-      a.download = `日本旅遊雲端備份_${new Date().toISOString().split('T')[0]}.json`;
+      // 檔名加上日期，方便辨識
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.download = `travel-backup-${dateStr}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      setMessage('雲端資料已成功打包下載！');
+      
+      alert('✅ 備份檔案已下載！請妥善保存。');
     } catch (error) {
       console.error(error);
-      alert('備份失敗，請檢查網路連線');
+      alert('❌ 備份失敗，請檢查網路連線。');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 2. 雲端匯入功能
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // 📥 還原備份 (從手機上傳)
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm('⚠️ 警告：這將會覆蓋「雲端」上現有的所有資料！\n\n如果你的旅伴正在編輯，他們的進度會被你洗掉。\n確定要還原嗎？')) {
-      event.target.value = '';
+    if (!confirm('⚠️ 警告：還原備份將會「完全覆蓋」目前的資料！\n\n您後來新增的待買清單或行程將會消失，確定要還原嗎？')) {
+      event.target.value = ''; // 清空選擇
       return;
     }
 
@@ -75,112 +75,91 @@ export const SettingsPage = () => {
     
     reader.onload = async (e) => {
       try {
-        const json = e.target?.result as string;
-        const data = JSON.parse(json);
+        const jsonContent = e.target?.result as string;
+        const backupData = JSON.parse(jsonContent);
 
-        if (typeof data !== 'object') throw new Error('格式錯誤');
+        // 檢查檔案格式是否正確
+        if (!backupData || typeof backupData !== 'object') {
+          throw new Error('無效的備份檔案');
+        }
 
-        for (const key of STORAGE_KEYS) {
-          if (data[key]) {
-            await saveToCloud(key, data[key]);
+        // 🔄 關鍵步驟：強制覆蓋每一筆資料
+        for (const key of DATA_KEYS) {
+          if (backupData[key] !== undefined) {
+            // 這會直接用備份檔的資料，蓋掉雲端的資料 (Overwrite)
+            await saveToCloud(key, backupData[key]);
           }
         }
 
-        alert('還原成功！雲端資料已更新，請重新整理網頁。');
-        window.location.href = '/';
-      } catch (err) {
-        alert('匯入失敗：檔案格式不正確');
+        alert('🎉 還原成功！網頁將自動重新整理以載入舊資料。');
+        
+        // 🔄 強制重新整理，確保畫面讀取到的是剛還原的舊資料
+        window.location.reload(); 
+
+      } catch (error) {
+        console.error(error);
+        alert('❌ 還原失敗：檔案格式錯誤或網路問題。');
       } finally {
         setIsLoading(false);
+        event.target.value = ''; // 清空選擇
       }
     };
+    
     reader.readAsText(file);
-    event.target.value = '';
-  };
-
-  // 3. 重置功能
-  const handleReset = async () => {
-    if (confirm('⚠️ 危險警告：這將會永久清空「雲端」上的所有行程與記帳！\n\n你的旅伴也會看到資料消失。\n確定要清空嗎？')) {
-      if (confirm('再次確認：真的要全部清空？(建議先下載備份)')) {
-        setIsLoading(true);
-        for (const key of STORAGE_KEYS) {
-          await saveToCloud(key, null);
-        }
-        alert('雲端資料已重置。');
-        window.location.href = '/';
-      }
-    }
   };
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {message && (
-        <div className="bg-green-100 text-green-700 p-3 rounded-xl mb-6 flex items-center text-sm font-bold animate-pulse">
-          <FontAwesomeIcon icon={faCheckCircle} className="mr-2" />
-          {message}
-        </div>
-      )}
+      <h2 className="text-2xl font-black text-[#5C4033] mb-6">設定與備份</h2>
 
       <div className="space-y-6">
         {/* 備份區塊 */}
-        <div className="nook-card p-6">
-          <h3 className="font-bold text-[#796C53] mb-2 text-lg">封存雲端資料</h3>
-          <p className="text-xs text-gray-400 mb-4">
-            將目前的雲端進度下載成檔案。建議每天備份一次，以防誤刪。
+        <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-[#F2F4E7]">
+          <h3 className="font-bold text-lg text-[#5E5340] mb-2 flex items-center">
+            <FontAwesomeIcon icon={faCloudArrowDown} className="mr-2 text-blue-500" />
+            備份資料 (Export)
+          </h3>
+          <p className="text-xs text-gray-400 mb-4 font-bold">
+            將目前的行程、清單、記帳等所有資料下載成一個檔案 (.json) 存到手機或電腦中。
           </p>
-          
           <button 
             onClick={handleExport}
             disabled={isLoading}
-            className="w-full bg-[#5C4033] text-white py-3 rounded-xl font-bold flex items-center justify-center space-x-2 active:scale-95 transition-transform disabled:opacity-50"
+            className="w-full py-3 rounded-xl font-bold text-white bg-[#5C4033] shadow-lg active:scale-95 transition-transform flex items-center justify-center"
           >
-            {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faDownload} />}
-            <span>{isLoading ? '處理中...' : '下載備份檔案'}</span>
+            {isLoading ? '處理中...' : <><FontAwesomeIcon icon={faFileExport} className="mr-2" /> 下載備份檔案</>}
           </button>
         </div>
 
         {/* 還原區塊 */}
-        <div className="nook-card p-6">
-          <h3 className="font-bold text-[#796C53] mb-2 text-lg">還原時光機</h3>
-          <p className="text-xs text-gray-400 mb-4">
-            讀取備份檔並覆蓋回雲端。救命專用。
-          </p>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-red-100">
+          <h3 className="font-bold text-lg text-red-800 mb-2 flex items-center">
+            <FontAwesomeIcon icon={faCloudArrowUp} className="mr-2 text-red-500" />
+            還原資料 (Import)
+          </h3>
           
-          <label className={`w-full bg-white border-2 border-[#5C4033] text-[#5C4033] py-3 rounded-xl font-bold flex items-center justify-center space-x-2 active:scale-95 transition-transform cursor-pointer hover:bg-orange-50 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-            {isLoading ? <FontAwesomeIcon icon={faSpinner} spin /> : <FontAwesomeIcon icon={faUpload} />}
-            <span>{isLoading ? '上傳中...' : '選擇檔案還原'}</span>
+          <div className="bg-red-50 p-3 rounded-xl mb-4 flex items-start space-x-2">
+            <FontAwesomeIcon icon={faTriangleExclamation} className="text-red-500 mt-0.5" />
+            <p className="text-xs font-bold text-red-600 leading-relaxed">
+              注意：此動作會「清除」目前網頁上的所有資料，並用備份檔案完全取代。請確認您選對了檔案！
+            </p>
+          </div>
+
+          <label className={`w-full py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 transition-transform flex items-center justify-center cursor-pointer ${isLoading ? 'bg-gray-400' : 'bg-red-500'}`}>
             <input 
               type="file" 
-              accept=".json" 
+              accept=".json"
               onChange={handleImport}
-              className="hidden" 
               disabled={isLoading}
+              className="hidden"
             />
+            {isLoading ? '還原中...' : <><FontAwesomeIcon icon={faFileImport} className="mr-2" /> 選擇備份檔並還原</>}
           </label>
         </div>
-
-        {/* 危險區塊 */}
-        <div className="bg-red-50 rounded-3xl p-6 border border-red-100 mt-8">
-          <h3 className="font-bold text-red-700 mb-2 text-lg flex items-center">
-            <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2" />
-            危險區域
-          </h3>
-          <p className="text-xs text-red-400 mb-4">
-            清空雲端所有資料，大家重新開始。
-          </p>
-          
-          <button 
-            onClick={handleReset}
-            disabled={isLoading}
-            className="w-full bg-white border border-red-200 text-red-500 py-3 rounded-xl font-bold active:scale-95 transition-transform hover:bg-red-100 disabled:opacity-50"
-          >
-            清空雲端資料
-          </button>
+        
+        <div className="text-center text-xs text-gray-300 font-bold mt-8">
+          版本 v1.0.5 | 資料儲存於 Supabase Cloud
         </div>
-      </div>
-      
-      <div className="text-center mt-8 text-xs text-gray-300 font-mono">
-        Cloud Version 2.0.0
       </div>
     </div>
   );
