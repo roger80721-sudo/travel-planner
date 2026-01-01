@@ -23,10 +23,8 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
   
   // 機票專屬
   const [departCode, setDepartCode] = useState('');
-  const [departName, setDepartName] = useState('');
   const [arriveCode, setArriveCode] = useState('');
-  const [arriveName, setArriveName] = useState('');
-  const [arriveTime, setArriveTime] = useState(''); // ✅ 新增：抵達時間狀態
+  const [arriveTime, setArriveTime] = useState('');
   const [baggage, setBaggage] = useState('');
   
   // 住宿/活動專屬
@@ -45,10 +43,8 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       setLink(initialData.link || '');
       
       setDepartCode(initialData.departCode || '');
-      setDepartName(initialData.departName || '');
       setArriveCode(initialData.arriveCode || '');
-      setArriveName(initialData.arriveName || '');
-      setArriveTime(initialData.arriveTime || ''); // ✅ 載入抵達時間
+      setArriveTime(initialData.arriveTime || '');
       setBaggage(initialData.baggage || '');
       
       setCheckOutDate(initialData.checkOutDate || '');
@@ -64,10 +60,10 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
     onSubmit({
       type, title, provider, date, time, reference, link,
       departCode: type === 'flight' ? departCode : undefined,
-      departName: type === 'flight' ? departName : undefined,
+      // 移除 departName
       arriveCode: type === 'flight' ? arriveCode : undefined,
-      arriveName: type === 'flight' ? arriveName : undefined,
-      arriveTime: type === 'flight' ? arriveTime : undefined, // ✅ 儲存抵達時間
+      // 移除 arriveName
+      arriveTime: type === 'flight' ? arriveTime : undefined,
       baggage: type === 'flight' ? baggage : undefined,
       checkOutDate: type === 'hotel' ? checkOutDate : undefined,
       address: type !== 'flight' ? address : undefined,
@@ -76,7 +72,6 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
   };
 
   return (
-    // ✅ 加入 overflow-x-hidden 防止整體往右滑
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-1">
       {/* 類型選擇 */}
       <div className="flex bg-gray-100 p-1 rounded-xl shrink-0">
@@ -109,11 +104,10 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
         />
       </div>
 
-      {/* ✈️ 機票專屬欄位 (✅ 改為垂直堆疊佈局，解決手機破版問題) */}
+      {/* ✈️ 機票專屬欄位 */}
       {type === 'flight' && (
         <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
           
-          {/* 航空公司與班號 */}
           <div className="flex space-x-3">
             <div className="flex-[1.5]">
               <label className="label-sub">航空公司</label>
@@ -134,11 +128,16 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
             </h4>
             <div className="space-y-3 pl-2">
                 <div>
-                    <label className="label-sub">機場代碼 / 城市</label>
-                    <div className="flex space-x-2">
-                        <input type="text" value={departCode} onChange={e => setDepartCode(e.target.value)} placeholder="TPE" className="w-20 text-center input-style font-mono uppercase" maxLength={3} />
-                        <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="台北桃園 T1" className="flex-1 input-style" />
-                    </div>
+                    <label className="label-sub">機場代碼 (例如：TPE)</label>
+                    {/* ✅ 修正：移除多餘的輸入框，讓代碼欄位佔滿整行 */}
+                    <input 
+                      type="text" 
+                      value={departCode} 
+                      onChange={e => setDepartCode(e.target.value)} 
+                      placeholder="TPE" 
+                      className="w-full text-center input-style font-mono uppercase text-lg tracking-widest" 
+                      maxLength={3} 
+                    />
                 </div>
                 <div className="flex space-x-3">
                     <div className="flex-[1.5]">
@@ -153,7 +152,6 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
             </div>
           </div>
 
-          {/* 分隔指示 */}
           <div className="flex justify-center py-1">
             <FontAwesomeIcon icon={faArrowDown} className="text-blue-200 animate-bounce" />
           </div>
@@ -165,15 +163,19 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
             </h4>
             <div className="space-y-3 pl-2">
                 <div>
-                    <label className="label-sub">機場代碼 / 城市</label>
-                    <div className="flex space-x-2">
-                        <input type="text" value={arriveCode} onChange={e => setArriveCode(e.target.value)} placeholder="NRT" className="w-20 text-center input-style font-mono uppercase" maxLength={3} />
-                        <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="東京成田 T2" className="flex-1 input-style" />
-                    </div>
+                    <label className="label-sub">機場代碼 (例如：NRT)</label>
+                    {/* ✅ 修正：移除多餘的輸入框 */}
+                    <input 
+                      type="text" 
+                      value={arriveCode} 
+                      onChange={e => setArriveCode(e.target.value)} 
+                      placeholder="NRT" 
+                      className="w-full text-center input-style font-mono uppercase text-lg tracking-widest" 
+                      maxLength={3} 
+                    />
                 </div>
                 <div>
                     <label className="label-sub"><FontAwesomeIcon icon={faClock} className="mr-1"/>抵達時間</label>
-                    {/* ✅ 新增：抵達時間輸入框 */}
                     <input type="time" value={arriveTime} onChange={e => setArriveTime(e.target.value)} className="w-full input-style text-center" />
                 </div>
             </div>
@@ -215,7 +217,7 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
              {image && <div className="mt-2 w-full h-32 rounded-lg overflow-hidden border border-gray-200 bg-white"><img src={image} alt="預覽" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} /></div>}
           </div>
 
-          {/* 通用時間欄位 (住宿/活動用) */}
+          {/* 通用時間欄位 */}
           <div className="flex space-x-2">
             <div className="flex-1">
               <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faCalendarDays} className="mr-1"/>日期/入住</label>
