@@ -1,35 +1,27 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlane, faBed, faTicket, faCopy, faLink, faTrashCan, faPen, faSuitcaseRolling, faLocationDot } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faTrashCan, faPen, faPlane, faHotel, faTicket, faSuitcaseRolling, faArrowRight 
+} from '@fortawesome/free-solid-svg-icons';
 
-// 定義資料格式
 export interface BookingItem {
   id: string;
   type: 'flight' | 'hotel' | 'activity';
-  title: string;       
-  provider: string;    
-  date: string;        
-  time: string;        
-  reference?: string;  
-  price?: string;      
-  link?: string;       
-  
+  title: string;
+  provider?: string;
+  date: string;
+  time?: string;
+  reference?: string;
+  link?: string;
   // 機票專屬
   departCode?: string;
   departName?: string;
   arriveCode?: string;
   arriveName?: string;
   baggage?: string;
-
-  // ▼▼▼ 新增：住宿專屬圖片 ▼▼▼
-  imageUrl?: string;
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+  // 住宿專屬
+  checkOutDate?: string;
+  address?: string;
 }
-
-const TYPE_CONFIG = {
-  flight:   { icon: faPlane,  label: '機票', color: 'bg-blue-500',  bg: 'bg-blue-50' },
-  hotel:    { icon: faBed,    label: '住宿', color: 'bg-emerald-500', bg: 'bg-emerald-50' },
-  activity: { icon: faTicket, label: '票券', color: 'bg-orange-500', bg: 'bg-orange-50' },
-};
 
 interface BookingCardProps {
   item: BookingItem;
@@ -38,133 +30,125 @@ interface BookingCardProps {
 }
 
 export const BookingCard = ({ item, onEdit, onDelete }: BookingCardProps) => {
-  const config = TYPE_CONFIG[item.type];
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert(`已複製：${text}`);
-  };
-
-  return (
-    <div className="bg-white rounded-2xl shadow-[4px_4px_0px_0px_#E0E5D5] border-2 border-transparent hover:border-orange-200 transition-all overflow-hidden mb-4 relative group">
-      {/* 頂部彩色條 */}
-      <div className={`h-2 ${config.color}`} />
-      
-      <div className="p-4">
-        {/* 標題區 */}
-        <div className="flex justify-between items-start mb-3">
+  
+  // ✈️ 機票卡片特別設計
+  if (item.type === 'flight') {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border-2 border-[#F2F4E7] overflow-hidden group relative">
+        {/* 頂部航空公司條 */}
+        <div className="bg-[#5C4033] px-4 py-2 flex justify-between items-center text-white">
           <div className="flex items-center space-x-2">
-            <div className={`w-8 h-8 rounded-full ${config.bg} flex items-center justify-center text-${config.color.split('-')[1]}-500`}>
-              <FontAwesomeIcon icon={config.icon} className="text-sm" />
-            </div>
-            <div>
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">{config.label}</span>
-              <h3 className="text-lg font-bold text-gray-700 leading-tight break-all">
-                {item.type === 'flight' ? item.provider : item.title}
-              </h3>
-            </div>
+            <FontAwesomeIcon icon={faPlane} className="text-xs opacity-70" />
+            <span className="font-bold text-sm">{item.provider}</span>
+            <span className="font-mono text-xs opacity-70">{item.title}</span>
           </div>
-          <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-             <button onClick={() => onEdit(item)} className="p-2 text-gray-300 hover:text-blue-400"><FontAwesomeIcon icon={faPen} /></button>
-             <button onClick={() => onDelete(item.id)} className="p-2 text-gray-300 hover:text-red-400"><FontAwesomeIcon icon={faTrashCan} /></button>
-          </div>
+          {item.reference && (
+            <div className="text-xs font-mono bg-white/20 px-2 py-0.5 rounded text-orange-100">
+              Ref: {item.reference}
+            </div>
+          )}
         </div>
 
-        {/* ▼▼▼ 新增：住宿專屬圖片顯示區 ▼▼▼ */}
-        {item.type === 'hotel' && item.imageUrl && (
-          <div className="mb-3 rounded-xl overflow-hidden h-48 relative">
-            <img 
-              src={item.imageUrl} 
-              alt={item.title}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              onError={(e) => (e.currentTarget.style.display = 'none')} // 圖片讀取失敗時隱藏
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            <div className="absolute bottom-2 left-3 text-white text-xs font-bold flex items-center">
-              <FontAwesomeIcon icon={faLocationDot} className="mr-1" />
-              {item.provider} {/* 顯示飯店地點或訂房網 */}
-            </div>
+        {/* 登機證內容 */}
+        <div className="p-4 flex items-center justify-between">
+          {/* 出發地 */}
+          <div className="text-center flex-1">
+            <div className="text-2xl font-black text-[#5E5340]">{item.departCode}</div>
+            <div className="text-[10px] text-gray-400 font-bold">{item.departName}</div>
+            <div className="text-sm font-bold text-[#5C4033] mt-1">{item.time}</div>
           </div>
-        )}
-        {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
 
-        {/* 機票專屬：飛行路徑視覺化 */}
-        {item.type === 'flight' && (
-          <div className="bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-center w-16">
-                <div className="text-2xl font-black text-blue-600 font-mono">{item.departCode || 'DEP'}</div>
-                <div className="text-[10px] font-bold text-gray-500 truncate">{item.departName || '出發地'}</div>
-                <div className="text-xs font-bold text-blue-400 mt-1">{item.time}</div>
+          {/* 中間飛機圖示與日期 */}
+          <div className="flex flex-col items-center justify-center px-2 flex-[1.5]">
+            <div className="text-[10px] font-bold text-gray-400 mb-1 font-mono">{item.date}</div>
+            <div className="flex items-center w-full space-x-2">
+              <div className="h-[2px] bg-gray-200 flex-1 relative">
+                <div className="absolute right-0 -top-1 w-1 h-1 rounded-full bg-gray-300"></div>
               </div>
-
-              <div className="flex-1 flex flex-col items-center px-2">
-                <div className="text-[10px] text-gray-400 font-bold mb-1">{item.date}</div>
-                <div className="w-full h-px bg-blue-200 relative flex items-center justify-center">
-                  <FontAwesomeIcon icon={faPlane} className="text-blue-400 bg-blue-50 px-1 transform rotate-90" />
-                </div>
-                <div className="text-[10px] text-gray-400 font-bold mt-1">{item.title}</div>
-              </div>
-
-              <div className="text-center w-16">
-                <div className="text-2xl font-black text-blue-600 font-mono">{item.arriveCode || 'ARR'}</div>
-                <div className="text-[10px] font-bold text-gray-500 truncate">{item.arriveName || '抵達地'}</div>
+              <FontAwesomeIcon icon={faPlane} className="text-[#3AA986] text-lg transform rotate-45" />
+              <div className="h-[2px] bg-gray-200 flex-1 relative">
+                <div className="absolute left-0 -top-1 w-1 h-1 rounded-full bg-gray-300"></div>
               </div>
             </div>
-
             {item.baggage && (
-              <div className="flex justify-center mt-2 border-t border-blue-100 pt-2">
-                <div className="flex items-center space-x-1 text-xs font-bold text-gray-500 bg-white px-3 py-1 rounded-full shadow-sm">
-                  <FontAwesomeIcon icon={faSuitcaseRolling} className="text-orange-400" />
-                  <span>託運限重:</span>
-                  <span className="text-gray-800">{item.baggage}</span>
-                </div>
+              <div className="mt-1 flex items-center text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                <FontAwesomeIcon icon={faSuitcaseRolling} className="mr-1" />
+                {item.baggage}
               </div>
             )}
           </div>
-        )}
 
-        {/* 一般資訊區 (非機票顯示) */}
-        {item.type !== 'flight' && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-gray-50 rounded-lg p-2">
-              <span className="text-[10px] text-gray-400 block">入住時間</span>
-              <span className="text-sm font-bold text-gray-600">{item.date} {item.time}</span>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-2">
-              <span className="text-[10px] text-gray-400 block">訂房來源/地點</span>
-              <span className="text-sm font-bold text-gray-600 truncate">{item.provider}</span>
-            </div>
+          {/* 目的地 */}
+          <div className="text-center flex-1">
+            <div className="text-2xl font-black text-[#5E5340]">{item.arriveCode}</div>
+            <div className="text-[10px] text-gray-400 font-bold">{item.arriveName}</div>
+            <div className="text-sm font-bold text-[#5C4033] mt-1">--:--</div> {/* 抵達時間通常不確定，留空或顯示 duration */}
           </div>
-        )}
+        </div>
 
-        {/* 底部連結 */}
-        <div className="flex space-x-2">
-          {item.reference && (
-            <div 
-              onClick={() => handleCopy(item.reference!)}
-              className="flex-1 bg-orange-50 border border-orange-100 rounded-xl p-2 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform"
-            >
-              <span className="text-[10px] text-orange-400 font-bold mb-1">訂位代號 (點擊複製)</span>
-              <div className="flex items-center space-x-2 text-orange-600 font-mono font-black text-lg truncate w-full justify-center">
-                <span>{item.reference}</span>
-                <FontAwesomeIcon icon={faCopy} className="text-xs opacity-50" />
-              </div>
-            </div>
-          )}
-          
-          {item.link && (
-            <a 
-              href={item.link} 
-              target="_blank" 
-              rel="noreferrer"
-              className="w-16 bg-blue-50 border border-blue-100 rounded-xl flex flex-col items-center justify-center text-blue-500 hover:bg-blue-100 transition-colors"
-            >
-              <FontAwesomeIcon icon={faLink} className="text-xl mb-1" />
-              <span className="text-[10px] font-bold">開啟</span>
-            </a>
+        {/* 編輯/刪除按鈕 (浮動) */}
+        <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(item)} className="p-1.5 bg-white/90 rounded-full text-blue-400 shadow-sm hover:scale-110 transition-transform">
+            <FontAwesomeIcon icon={faPen} className="text-xs" />
+          </button>
+          <button onClick={() => onDelete(item.id)} className="p-1.5 bg-white/90 rounded-full text-red-400 shadow-sm hover:scale-110 transition-transform">
+            <FontAwesomeIcon icon={faTrashCan} className="text-xs" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 🏨 住宿/活動卡片 (維持簡潔風格)
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#F2F4E7] flex justify-between items-start group relative">
+      <div className="flex-1">
+        <div className="flex items-center space-x-2 mb-1">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded text-white ${item.type === 'hotel' ? 'bg-indigo-400' : 'bg-green-500'}`}>
+            <FontAwesomeIcon icon={item.type === 'hotel' ? faHotel : faTicket} className="mr-1" />
+            {item.type === 'hotel' ? '住宿' : '票券'}
+          </span>
+          <span className="text-[10px] text-gray-400 font-bold">{item.provider}</span>
+        </div>
+        
+        <h3 className="font-black text-[#5E5340] text-lg mb-1">{item.title}</h3>
+        
+        <div className="text-xs font-bold text-gray-500 flex items-center flex-wrap gap-2">
+          <span className="bg-gray-50 px-2 py-1 rounded">{item.date} {item.time}</span>
+          {item.checkOutDate && (
+            <>
+              <FontAwesomeIcon icon={faArrowRight} className="text-[10px] text-gray-300" />
+              <span className="bg-gray-50 px-2 py-1 rounded">{item.checkOutDate}</span>
+            </>
           )}
         </div>
+        
+        {item.reference && (
+          <div className="mt-2 text-xs font-mono text-gray-400">
+            單號：<span className="select-all bg-yellow-50 px-1 rounded border border-yellow-100 text-yellow-700">{item.reference}</span>
+          </div>
+        )}
+      </div>
+
+      {item.link && (
+        <a 
+          href={item.link} 
+          target="_blank" 
+          rel="noreferrer"
+          className="ml-3 px-3 py-2 bg-[#F2F4E7] text-[#5C4033] rounded-xl text-xs font-bold hover:bg-[#E8EAE0] transition-colors"
+        >
+          查看
+        </a>
+      )}
+
+      {/* 編輯/刪除按鈕 */}
+      <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onEdit(item)} className="p-1.5 bg-white rounded-full text-blue-400 shadow-sm border border-gray-100 hover:scale-110">
+          <FontAwesomeIcon icon={faPen} className="text-xs" />
+        </button>
+        <button onClick={() => onDelete(item.id)} className="p-1.5 bg-white rounded-full text-red-400 shadow-sm border border-gray-100 hover:scale-110">
+          <FontAwesomeIcon icon={faTrashCan} className="text-xs" />
+        </button>
       </div>
     </div>
   );

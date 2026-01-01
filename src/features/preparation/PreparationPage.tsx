@@ -9,7 +9,7 @@ import {
 import { Modal } from '../../components/ui/Modal';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
-// ▼▼▼ 資料結構 ▼▼▼
+// 資料結構
 interface CheckItem {
   id: string;
   text: string;
@@ -26,12 +26,11 @@ interface Category {
   items: CheckItem[];
 }
 
-// 會話字卡結構
 interface Phrase {
   id: string;
-  cn: string;    // 中文意思
-  jp: string;    // 日文 (給對方看)
-  romaji: string; // 羅馬拼音 (給自己看)
+  cn: string;
+  jp: string;
+  romaji: string;
   tag: 'basic' | 'food' | 'shopping' | 'traffic';
 }
 
@@ -58,36 +57,26 @@ const INITIAL_SHOPPING: Category[] = [
   }
 ];
 
-// ▼▼▼ 內建日文會話資料庫 ▼▼▼
 const JAPANESE_PHRASES: Phrase[] = [
-  // 基本
   { id: 'b1', cn: '不好意思 / 請問...', jp: 'すみません', romaji: 'Sumimasen', tag: 'basic' },
   { id: 'b2', cn: '謝謝', jp: 'ありがとうございます', romaji: 'Arigatou gozaimasu', tag: 'basic' },
   { id: 'b3', cn: '可以用英文嗎？', jp: '英語でもいいですか？', romaji: 'Eigo demo ii desu ka?', tag: 'basic' },
   { id: 'b4', cn: '我想去這裡 (指地圖)', jp: 'ここに行きたいです', romaji: 'Koko ni ikitai desu', tag: 'traffic' },
-  
-  // 餐廳
   { id: 'f1', cn: '請問有位子嗎？(2人)', jp: '2人ですが、入れますか？', romaji: 'Futari desuga, hairemasuka?', tag: 'food' },
   { id: 'f2', cn: '我要這個 (指菜單)', jp: 'これをください', romaji: 'Kore o kudasai', tag: 'food' },
   { id: 'f3', cn: '請給我水', jp: 'お水をください', romaji: 'Omizu o kudasai', tag: 'food' },
   { id: 'f4', cn: '請問廁所哪裡？', jp: 'トイレはどこですか？', romaji: 'Toire wa doko desuka?', tag: 'basic' },
   { id: 'f5', cn: '結帳', jp: 'お会計をお願いします', romaji: 'Okaikei o onegaishimasu', tag: 'food' },
   { id: 'f6', cn: '我不吃牛肉', jp: '牛肉は食べられません', romaji: 'Gyuniku wa taberaremasen', tag: 'food' },
-
-  // 購物
   { id: 's1', cn: '這個多少錢？', jp: 'これはいくらですか？', romaji: 'Kore wa ikura desuka?', tag: 'shopping' },
   { id: 's2', cn: '可以免稅嗎？', jp: '免税できますか？', romaji: 'Menzei dekimasu ka?', tag: 'shopping' },
   { id: 's3', cn: '可以刷卡嗎？', jp: 'カードは使えますか？', romaji: 'Kaado wa tsukaemasu ka?', tag: 'shopping' },
   { id: 's4', cn: '我有袋子', jp: '袋は持っています', romaji: 'Fukuro wa motte imasu', tag: 'shopping' },
-  
-  // 交通
   { id: 't1', cn: '車站由哪裡？', jp: '駅はどこですか？', romaji: 'Eki wa doko desuka?', tag: 'traffic' },
   { id: 't2', cn: '這班車有到___嗎？', jp: 'この電車は___に行きますか？', romaji: 'Kono densha wa ___ ni ikimasu ka?', tag: 'traffic' },
 ];
 
 export const PreparationPage = () => {
-  // ▼▼▼ 狀態管理 ▼▼▼
-  // 新增 'speaking' 分頁
   const [activeTab, setActiveTab] = useState<'packing' | 'shopping' | 'speaking'>('packing');
   
   const [packingCats, setPackingCats] = useState<Category[]>(INITIAL_PACKING);
@@ -102,11 +91,8 @@ export const PreparationPage = () => {
   const [viewMode, setViewMode] = useState<'individual' | 'summary'>('individual');
   
   const [pricingItemId, setPricingItemId] = useState<string | null>(null);
-
-  // 會話過濾狀態
   const [phraseFilter, setPhraseFilter] = useState<'all' | 'basic' | 'food' | 'shopping' | 'traffic'>('all');
 
-  // Modal 狀態
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [formCatTitle, setFormCatTitle] = useState('');
@@ -165,7 +151,6 @@ export const PreparationPage = () => {
 
   const currentCategories = activeTab === 'packing' ? packingCats : shoppingCats;
 
-  // 通用操作邏輯
   const toggleCheck = (catId: string, itemId: string) => {
     if (viewMode === 'summary') return;
     const newCategories = currentCategories.map(cat => {
@@ -242,6 +227,24 @@ export const PreparationPage = () => {
     }
   };
 
+  // ▼▼▼ 新增：編輯項目功能 ▼▼▼
+  const editItem = (catId: string, itemId: string, oldText: string) => {
+    const newText = window.prompt("修改項目名稱：", oldText);
+    if (newText !== null && newText.trim() !== "") {
+      const newCategories = currentCategories.map(cat => {
+        if (cat.id === catId) {
+          return {
+            ...cat,
+            items: cat.items.map(item => item.id === itemId ? { ...item, text: newText.trim() } : item)
+          };
+        }
+        return cat;
+      });
+      saveCurrentData(newCategories);
+    }
+  };
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
   const deleteItem = (catId: string, itemId: string) => {
     const newCategories = currentCategories.map(cat => {
       if (cat.id === catId) {
@@ -291,7 +294,6 @@ export const PreparationPage = () => {
     return Math.round((myChecked / myItems) * 100);
   };
 
-  // Modal helpers
   const openAddCatModal = () => {
     setEditingCat(null);
     setFormCatTitle('');
@@ -316,7 +318,7 @@ export const PreparationPage = () => {
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {/* 頂部 Tab 切換 */}
+      {/* 頂部 Tab */}
       <div className="bg-[#F2F4E7] p-1 rounded-2xl flex space-x-1 mb-4 border-2 border-[#E5E7EB] overflow-x-auto no-scrollbar">
         <button onClick={() => setActiveTab('packing')} className={`flex-1 py-2 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all min-w-[100px] ${activeTab === 'packing' ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400'}`}>
           <FontAwesomeIcon icon={faSuitcase} /><span>行李</span>
@@ -324,16 +326,14 @@ export const PreparationPage = () => {
         <button onClick={() => setActiveTab('shopping')} className={`flex-1 py-2 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all min-w-[100px] ${activeTab === 'shopping' ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400'}`}>
           <FontAwesomeIcon icon={faBagShopping} /><span>待買</span>
         </button>
-        {/* 新增會話 Tab */}
         <button onClick={() => setActiveTab('speaking')} className={`flex-1 py-2 rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition-all min-w-[100px] ${activeTab === 'speaking' ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400'}`}>
           <FontAwesomeIcon icon={faComments} /><span>會話</span>
         </button>
       </div>
 
-      {/* ▼▼▼ 如果是行李或購物模式 ▼▼▼ */}
+      {/* 如果是行李或購物模式 */}
       {activeTab !== 'speaking' && (
         <>
-          {/* 成員切換列 */}
           <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar pb-2">
             <button
               onClick={() => setViewMode('summary')}
@@ -443,7 +443,13 @@ export const PreparationPage = () => {
                                      </button>
                                   )}
 
-                                  <button onClick={() => deleteItem(cat.id, item.id)} className="text-gray-200 hover:text-red-300 p-2"><FontAwesomeIcon icon={faTrashCan} className="text-xs" /></button>
+                                  {/* ▼▼▼ 新增：編輯按鈕 ▼▼▼ */}
+                                  <button onClick={() => editItem(cat.id, item.id, item.text)} className="text-gray-200 hover:text-blue-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <FontAwesomeIcon icon={faPen} className="text-xs" />
+                                  </button>
+                                  {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
+
+                                  <button onClick={() => deleteItem(cat.id, item.id)} className="text-gray-200 hover:text-red-300 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><FontAwesomeIcon icon={faTrashCan} className="text-xs" /></button>
                                </div>
 
                                {isPricing && (
@@ -514,10 +520,8 @@ export const PreparationPage = () => {
         </>
       )}
 
-      {/* ▼▼▼ 旅遊會話 Tab ▼▼▼ */}
       {activeTab === 'speaking' && (
         <div>
-          {/* 會話分類濾鏡 */}
           <div className="flex space-x-2 mb-4 overflow-x-auto no-scrollbar">
             {[
               { id: 'all', label: '全部', icon: faComments },
@@ -540,7 +544,6 @@ export const PreparationPage = () => {
             ))}
           </div>
 
-          {/* 會話列表 */}
           <div className="space-y-3">
             {JAPANESE_PHRASES
               .filter(p => phraseFilter === 'all' || p.tag === phraseFilter)
