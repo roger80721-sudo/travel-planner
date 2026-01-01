@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlane, faHotel, faTicket, faCalendarDays, faClock, 
-  faLocationDot, faSuitcaseRolling, faImage 
+  faLocationDot, faSuitcaseRolling, faImage, faPlaneDeparture, faPlaneArrival, faArrowDown
 } from '@fortawesome/free-solid-svg-icons';
 import type { BookingItem } from './BookingCard';
 
@@ -21,17 +21,18 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
   const [reference, setReference] = useState('');
   const [link, setLink] = useState('');
   
+  // 機票專屬
   const [departCode, setDepartCode] = useState('');
   const [departName, setDepartName] = useState('');
   const [arriveCode, setArriveCode] = useState('');
   const [arriveName, setArriveName] = useState('');
+  const [arriveTime, setArriveTime] = useState(''); // ✅ 新增：抵達時間狀態
   const [baggage, setBaggage] = useState('');
   
+  // 住宿/活動專屬
   const [checkOutDate, setCheckOutDate] = useState('');
   const [address, setAddress] = useState('');
-  
-  // ✅ 修正 1：統一變數名稱為 image (原本可能是 imageUrl)
-  const [image, setImage] = useState(''); 
+  const [image, setImage] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -47,12 +48,12 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       setDepartName(initialData.departName || '');
       setArriveCode(initialData.arriveCode || '');
       setArriveName(initialData.arriveName || '');
+      setArriveTime(initialData.arriveTime || ''); // ✅ 載入抵達時間
       setBaggage(initialData.baggage || '');
       
       setCheckOutDate(initialData.checkOutDate || '');
       setAddress(initialData.address || '');
-      // ✅ 修正 2：如果 initialData.image 是 undefined，就用空字串 '' 避免報錯
-      setImage(initialData.image || ''); 
+      setImage(initialData.image || '');
     }
   }, [initialData]);
 
@@ -61,28 +62,24 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
     if (!title || !date) return;
 
     onSubmit({
-      type,
-      title,
-      provider,
-      date,
-      time,
-      reference,
-      link,
+      type, title, provider, date, time, reference, link,
       departCode: type === 'flight' ? departCode : undefined,
       departName: type === 'flight' ? departName : undefined,
       arriveCode: type === 'flight' ? arriveCode : undefined,
       arriveName: type === 'flight' ? arriveName : undefined,
+      arriveTime: type === 'flight' ? arriveTime : undefined, // ✅ 儲存抵達時間
       baggage: type === 'flight' ? baggage : undefined,
       checkOutDate: type === 'hotel' ? checkOutDate : undefined,
       address: type !== 'flight' ? address : undefined,
-      // ✅ 修正 3：使用 image 欄位
-      image: type !== 'flight' ? image : undefined, 
+      image: type !== 'flight' ? image : undefined,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-      <div className="flex bg-gray-100 p-1 rounded-xl">
+    // ✅ 加入 overflow-x-hidden 防止整體往右滑
+    <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto overflow-x-hidden px-1">
+      {/* 類型選擇 */}
+      <div className="flex bg-gray-100 p-1 rounded-xl shrink-0">
         {[
           { id: 'flight', label: '機票', icon: faPlane },
           { id: 'hotel', label: '住宿', icon: faHotel },
@@ -92,7 +89,7 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
             key={t.id}
             type="button"
             onClick={() => setType(t.id as any)}
-            className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all
+            className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all whitespace-nowrap
               ${type === t.id ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400'}`}
           >
             <FontAwesomeIcon icon={t.icon} />
@@ -107,15 +104,18 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
           type="text" 
           value={title} 
           onChange={e => setTitle(e.target.value)} 
-          placeholder={type === 'flight' ? '例如：去程班機' : '例如：東京灣希爾頓'} 
+          placeholder={type === 'flight' ? '例如：去程班機 (TPE-NRT)' : '例如：東京灣希爾頓'} 
           className="w-full input-style"
         />
       </div>
 
+      {/* ✈️ 機票專屬欄位 (✅ 改為垂直堆疊佈局，解決手機破版問題) */}
       {type === 'flight' && (
-        <div className="space-y-3 bg-blue-50 p-3 rounded-xl border border-blue-100">
-          <div className="flex space-x-2">
-            <div className="flex-1">
+        <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
+          
+          {/* 航空公司與班號 */}
+          <div className="flex space-x-3">
+            <div className="flex-[1.5]">
               <label className="label-sub">航空公司</label>
               <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder="例如：星宇航空" className="w-full input-style" />
             </div>
@@ -124,32 +124,71 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
               <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="JX800" className="w-full input-style font-mono uppercase" />
             </div>
           </div>
-          
-          <div className="flex space-x-2 items-center">
-            <div className="flex-1">
-              <label className="label-sub">出發 (代碼/城市)</label>
-              <div className="flex space-x-1">
-                <input type="text" value={departCode} onChange={e => setDepartCode(e.target.value)} placeholder="TPE" className="w-14 text-center input-style font-mono uppercase" maxLength={3} />
-                <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="台北" className="flex-1 input-style" />
-              </div>
-            </div>
-            <div className="text-gray-300"><FontAwesomeIcon icon={faPlane} /></div>
-            <div className="flex-1">
-              <label className="label-sub">抵達 (代碼/城市)</label>
-              <div className="flex space-x-1">
-                <input type="text" value={arriveCode} onChange={e => setArriveCode(e.target.value)} placeholder="NRT" className="w-14 text-center input-style font-mono uppercase" maxLength={3} />
-                <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="成田" className="flex-1 input-style" />
-              </div>
+
+          <div className="my-2 border-t border-blue-100/50"></div>
+
+          {/* 🛫 出發區塊 (垂直) */}
+          <div>
+            <h4 className="text-sm font-black text-[#5C4033] mb-2 flex items-center">
+                <FontAwesomeIcon icon={faPlaneDeparture} className="mr-2 text-blue-400"/>出發資訊 (Departure)
+            </h4>
+            <div className="space-y-3 pl-2">
+                <div>
+                    <label className="label-sub">機場代碼 / 城市</label>
+                    <div className="flex space-x-2">
+                        <input type="text" value={departCode} onChange={e => setDepartCode(e.target.value)} placeholder="TPE" className="w-20 text-center input-style font-mono uppercase" maxLength={3} />
+                        <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="台北桃園 T1" className="flex-1 input-style" />
+                    </div>
+                </div>
+                <div className="flex space-x-3">
+                    <div className="flex-[1.5]">
+                        <label className="label-sub"><FontAwesomeIcon icon={faCalendarDays} className="mr-1"/>出發日期</label>
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full input-style" />
+                    </div>
+                    <div className="flex-1">
+                        <label className="label-sub"><FontAwesomeIcon icon={faClock} className="mr-1"/>出發時間</label>
+                        <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full input-style text-center" />
+                    </div>
+                </div>
             </div>
           </div>
 
+          {/* 分隔指示 */}
+          <div className="flex justify-center py-1">
+            <FontAwesomeIcon icon={faArrowDown} className="text-blue-200 animate-bounce" />
+          </div>
+
+          {/* 🛬 抵達區塊 (垂直) */}
+          <div>
+             <h4 className="text-sm font-black text-[#5C4033] mb-2 flex items-center">
+                <FontAwesomeIcon icon={faPlaneArrival} className="mr-2 text-teal-400"/>抵達資訊 (Arrival)
+            </h4>
+            <div className="space-y-3 pl-2">
+                <div>
+                    <label className="label-sub">機場代碼 / 城市</label>
+                    <div className="flex space-x-2">
+                        <input type="text" value={arriveCode} onChange={e => setArriveCode(e.target.value)} placeholder="NRT" className="w-20 text-center input-style font-mono uppercase" maxLength={3} />
+                        <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="東京成田 T2" className="flex-1 input-style" />
+                    </div>
+                </div>
+                <div>
+                    <label className="label-sub"><FontAwesomeIcon icon={faClock} className="mr-1"/>抵達時間</label>
+                    {/* ✅ 新增：抵達時間輸入框 */}
+                    <input type="time" value={arriveTime} onChange={e => setArriveTime(e.target.value)} className="w-full input-style text-center" />
+                </div>
+            </div>
+          </div>
+
+          <div className="my-2 border-t border-blue-100/50"></div>
+
           <div>
              <label className="label-sub"><FontAwesomeIcon icon={faSuitcaseRolling} className="mr-1" />行李額度</label>
-             <input type="text" value={baggage} onChange={e => setBaggage(e.target.value)} placeholder="例如：23kg x 2" className="w-full input-style" />
+             <input type="text" value={baggage} onChange={e => setBaggage(e.target.value)} placeholder="例如：托運 23kg x 2 / 手提 7kg" className="w-full input-style" />
           </div>
         </div>
       )}
 
+      {/* 🏨 住宿/活動專屬欄位 (保持不變) */}
       {type !== 'flight' && (
         <>
           <div className="flex space-x-2">
@@ -168,44 +207,27 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
             <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="輸入地址..." className="w-full input-style" />
           </div>
 
-          {/* ✅ 修正 4：圖片輸入欄位，使用 image 變數 */}
           <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
              <label className="block text-xs font-bold text-gray-400 mb-2 flex items-center">
                <FontAwesomeIcon icon={faImage} className="mr-1" /> 封面照片 (圖片網址)
              </label>
-             <div className="flex space-x-2">
-               <input 
-                 type="url" 
-                 value={image} 
-                 onChange={e => setImage(e.target.value)} 
-                 placeholder="https://..." 
-                 className="flex-1 input-style text-xs"
-               />
-             </div>
-             {image && (
-               <div className="mt-2 w-full h-32 rounded-lg overflow-hidden border border-gray-200 bg-white">
-                 <img 
-                   src={image} 
-                   alt="預覽" 
-                   className="w-full h-full object-cover" 
-                   onError={(e) => e.currentTarget.style.display = 'none'} 
-                 />
-               </div>
-             )}
+             <input type="url" value={image} onChange={e => setImage(e.target.value)} placeholder="https://..." className="w-full input-style text-xs" />
+             {image && <div className="mt-2 w-full h-32 rounded-lg overflow-hidden border border-gray-200 bg-white"><img src={image} alt="預覽" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} /></div>}
+          </div>
+
+          {/* 通用時間欄位 (住宿/活動用) */}
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faCalendarDays} className="mr-1"/>日期/入住</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full input-style" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faClock} className="mr-1"/>時間</label>
+              <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full input-style text-center" />
+            </div>
           </div>
         </>
       )}
-
-      <div className="flex space-x-2">
-        <div className="flex-1">
-          <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faCalendarDays} className="mr-1"/>日期</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full input-style" />
-        </div>
-        <div className="flex-1">
-          <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faClock} className="mr-1"/>時間</label>
-          <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full input-style text-center" />
-        </div>
-      </div>
 
       {type === 'hotel' && (
         <div>
@@ -219,13 +241,13 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
         <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://" className="w-full input-style text-blue-500" />
       </div>
 
-      <div className="pt-4 flex space-x-3">
+      <div className="pt-4 flex space-x-3 shrink-0">
         <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold text-gray-400 bg-[#F2F4E7]">取消</button>
         <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-[#5C4033] shadow-lg">儲存</button>
       </div>
 
       <style>{`
-        .input-style { background: white; border: 2px solid #F3F4F6; border-radius: 0.75rem; padding: 0.6rem 1rem; font-weight: 700; color: #5E5340; outline: none; transition: all; }
+        .input-style { background: white; border: 2px solid #F3F4F6; border-radius: 0.75rem; padding: 0.6rem 1rem; font-weight: 700; color: #5E5340; outline: none; transition: all; width: 100%; }
         .input-style:focus { border-color: #FDBA74; }
         .label-sub { font-size: 0.65rem; font-weight: 800; color: #9CA3AF; margin-bottom: 0.1rem; display: block; }
       `}</style>
