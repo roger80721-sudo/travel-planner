@@ -7,7 +7,7 @@ import { DateSelector } from './components/DateSelector';
 import { TimelineItem, type ScheduleItem } from './components/TimelineItem';
 import { Modal } from '../../components/ui/Modal';
 import { AddScheduleForm } from './components/AddScheduleForm';
-import { ManageDatesForm } from './components/ManageDatesForm';
+import { ManageDatesForm } from './components/ManageDatesForm'; // ✅ 確保引入
 import { calculateNewTime } from '../../utils/timeUtils';
 import { loadFromCloud, saveToCloud } from '../../utils/supabase';
 
@@ -17,7 +17,7 @@ export interface ScheduleDay {
   items: ScheduleItem[];
 }
 
-// 更新預設資料，加入範例備註
+// 預設資料
 const INITIAL_DATA: ScheduleDay[] = [
   {
     date: '2025-02-27',
@@ -27,7 +27,7 @@ const INITIAL_DATA: ScheduleDay[] = [
         id: '1', time: '10:00', type: 'activity', title: '清水寺', duration: '2h', location: '京都', weather: 'sunny',
         coldKnowledge: '你知道這裡的舞台沒用一根釘子嗎？',
         historyDescription: '清水寺本堂的「清水舞台」是靠著 139 根巨大的櫸木柱並列支撐起來的，完全沒有使用任何一根釘子。',
-        notes: '記得帶御朱印帳！從 3 號出口走比較近。' // 範例備註
+        notes: '記得帶御朱印帳！從 3 號出口走比較近。'
       },
     ] as ScheduleItem[]
   }
@@ -54,14 +54,13 @@ export const SchedulePage = () => {
       
       const cloudSchedules = await loadFromCloud('travel-planner-data');
       if (cloudSchedules) {
-        // 資料遷移：確保 notes 欄位存在
         const migrated = cloudSchedules.map((day: any) => ({
           ...day,
           items: day.items.map((item: any) => ({
             ...item,
             coldKnowledge: item.coldKnowledge || item.factSummary,
             historyDescription: item.historyDescription || item.factDetails,
-            notes: item.notes || '' // 舊資料補上空字串
+            notes: item.notes || ''
           }))
         }));
         setSchedules(migrated);
@@ -188,6 +187,7 @@ export const SchedulePage = () => {
 
   return (
     <div className="relative min-h-full pb-24">
+      {/* 標題與倒數區塊 */}
       <div className="px-5 pt-4 mb-2">
         <div className="bg-[#5C4033] text-white rounded-2xl p-4 shadow-lg mb-4 flex items-center justify-between relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-white opacity-10 rounded-full" />
@@ -230,11 +230,15 @@ export const SchedulePage = () => {
         </div>
       </div>
 
-      <DateSelector 
-        dates={schedules.map(d => ({ date: d.date, label: d.dayOfWeek }))}
-        selectedDate={selectedDate}
-        onSelect={setSelectedDate}
-      />
+      {/* ▼▼▼ 修改：日期選單固定 (Sticky) ▼▼▼ */}
+      <div className="sticky top-0 z-20 bg-[#FBFBFB] pt-2 pb-2 shadow-sm transition-shadow">
+        <DateSelector 
+          dates={schedules.map(d => ({ date: d.date, label: d.dayOfWeek }))}
+          selectedDate={selectedDate}
+          onSelect={setSelectedDate}
+        />
+      </div>
+      {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
 
       <div className="mt-4 px-1">
         <DragDropContext onDragEnd={handleDragEnd}>
