@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlane, faBed, faTicket, faSuitcase, faImage, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faPlane, faHotel, faTicket, faCalendarDays, faClock, 
+  faLocationDot, faSuitcaseRolling, faImage 
+} from '@fortawesome/free-solid-svg-icons';
 import type { BookingItem } from './BookingCard';
-
-const TYPE_OPTIONS = [
-  { value: 'flight', label: '機票', icon: faPlane },
-  { value: 'hotel', label: '住宿', icon: faBed },
-  { value: 'activity', label: '票券', icon: faTicket },
-];
 
 interface AddBookingFormProps {
   initialData?: BookingItem | null;
@@ -16,31 +13,33 @@ interface AddBookingFormProps {
 }
 
 export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFormProps) => {
-  const [type, setType] = useState('flight');
+  const [type, setType] = useState<'flight' | 'hotel' | 'activity'>('flight');
   const [title, setTitle] = useState('');
   const [provider, setProvider] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [reference, setReference] = useState('');
   const [link, setLink] = useState('');
-
-  // 機票專屬欄位
+  
   const [departCode, setDepartCode] = useState('');
   const [departName, setDepartName] = useState('');
   const [arriveCode, setArriveCode] = useState('');
   const [arriveName, setArriveName] = useState('');
   const [baggage, setBaggage] = useState('');
-
-  // 住宿圖片欄位
-  const [imageUrl, setImageUrl] = useState('');
+  
+  const [checkOutDate, setCheckOutDate] = useState('');
+  const [address, setAddress] = useState('');
+  
+  // ✅ 修正 1：統一變數名稱為 image (原本可能是 imageUrl)
+  const [image, setImage] = useState(''); 
 
   useEffect(() => {
     if (initialData) {
       setType(initialData.type);
       setTitle(initialData.title);
-      setProvider(initialData.provider);
+      setProvider(initialData.provider || '');
       setDate(initialData.date);
-      setTime(initialData.time);
+      setTime(initialData.time || '');
       setReference(initialData.reference || '');
       setLink(initialData.link || '');
       
@@ -49,28 +48,20 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       setArriveCode(initialData.arriveCode || '');
       setArriveName(initialData.arriveName || '');
       setBaggage(initialData.baggage || '');
-      setImageUrl(initialData.imageUrl || '');
+      
+      setCheckOutDate(initialData.checkOutDate || '');
+      setAddress(initialData.address || '');
+      // ✅ 修正 2：如果 initialData.image 是 undefined，就用空字串 '' 避免報錯
+      setImage(initialData.image || ''); 
     }
   }, [initialData]);
 
-  // ▼▼▼ 新增：搜尋圖片的輔助函式 ▼▼▼
-  const handleSearchImage = () => {
-    if (!title && !provider) {
-      alert('請先輸入飯店名稱或地點喔！');
-      return;
-    }
-    // 搜尋關鍵字：地點 + 標題 (例如：大阪梅田大和魯內酒店)
-    const query = `${provider} ${title}`; 
-    const url = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`;
-    window.open(url, '_blank');
-  };
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) return;
+    if (!title || !date) return;
+
     onSubmit({
-      type: type as any,
+      type,
       title,
       provider,
       date,
@@ -82,142 +73,162 @@ export const AddBookingForm = ({ initialData, onSubmit, onCancel }: AddBookingFo
       arriveCode: type === 'flight' ? arriveCode : undefined,
       arriveName: type === 'flight' ? arriveName : undefined,
       baggage: type === 'flight' ? baggage : undefined,
-      imageUrl: type === 'hotel' ? imageUrl : undefined,
+      checkOutDate: type === 'hotel' ? checkOutDate : undefined,
+      address: type !== 'flight' ? address : undefined,
+      // ✅ 修正 3：使用 image 欄位
+      image: type !== 'flight' ? image : undefined, 
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-      {/* 類型選擇 */}
-      <div className="flex space-x-2 bg-white p-1 rounded-xl border-2 border-orange-100">
-        {TYPE_OPTIONS.map((opt) => (
+      <div className="flex bg-gray-100 p-1 rounded-xl">
+        {[
+          { id: 'flight', label: '機票', icon: faPlane },
+          { id: 'hotel', label: '住宿', icon: faHotel },
+          { id: 'activity', label: '票券/活動', icon: faTicket },
+        ].map((t) => (
           <button
-            key={opt.value}
+            key={t.id}
             type="button"
-            onClick={() => setType(opt.value)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-1
-              ${type === opt.value ? 'bg-[#5C4033] text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+            onClick={() => setType(t.id as any)}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all
+              ${type === t.id ? 'bg-white text-[#5C4033] shadow-sm' : 'text-gray-400'}`}
           >
-            <FontAwesomeIcon icon={opt.icon} />
-            <span>{opt.label}</span>
+            <FontAwesomeIcon icon={t.icon} />
+            <span>{t.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="space-y-3">
-        {/* 基本資訊 */}
-        <div className="flex space-x-2">
-           <div className="flex-1">
-             <label className="block text-xs font-bold text-gray-400 mb-1">
-                {type === 'flight' ? '航空公司' : '供應商/地點'}
-             </label>
-             <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder={type === 'flight' ? "例如：星宇航空" : "Agoda"} className="w-full input-style" />
-           </div>
-           <div className="flex-1">
-             <label className="block text-xs font-bold text-gray-400 mb-1">
-                {type === 'flight' ? '航班代號' : '標題/房型'}
-             </label>
-             <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'flight' ? "JX821" : "雙人房"} className="w-full input-style" />
-           </div>
-        </div>
+      <div>
+        <label className="block text-xs font-bold text-gray-400 mb-1">標題</label>
+        <input 
+          type="text" 
+          value={title} 
+          onChange={e => setTitle(e.target.value)} 
+          placeholder={type === 'flight' ? '例如：去程班機' : '例如：東京灣希爾頓'} 
+          className="w-full input-style"
+        />
+      </div>
 
-        {/* 機票專屬輸入區 */}
-        {type === 'flight' && (
-          <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 space-y-3">
-            <h4 className="text-xs font-bold text-blue-500 mb-2">✈️ 航段資訊</h4>
-            <div className="flex space-x-2">
-              <div className="w-1/3">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1">出發代號</label>
-                <input type="text" value={departCode} onChange={e => setDepartCode(e.target.value.toUpperCase())} placeholder="TPE" className="w-full input-style text-center font-mono" maxLength={3} />
-              </div>
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1">出發機場</label>
-                <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="桃園機場" className="w-full input-style" />
-              </div>
+      {type === 'flight' && (
+        <div className="space-y-3 bg-blue-50 p-3 rounded-xl border border-blue-100">
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <label className="label-sub">航空公司</label>
+              <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder="例如：星宇航空" className="w-full input-style" />
             </div>
-            <div className="flex space-x-2">
-              <div className="w-1/3">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1">抵達代號</label>
-                <input type="text" value={arriveCode} onChange={e => setArriveCode(e.target.value.toUpperCase())} placeholder="KIX" className="w-full input-style text-center font-mono" maxLength={3} />
-              </div>
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1">抵達機場</label>
-                <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="關西機場" className="w-full input-style" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faSuitcase} className="mr-1" />託運行李限額</label>
-              <input type="text" value={baggage} onChange={e => setBaggage(e.target.value)} placeholder="例如：23kg x 2" className="w-full input-style" />
+            <div className="flex-1">
+              <label className="label-sub">班機號碼</label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="JX800" className="w-full input-style font-mono uppercase" />
             </div>
           </div>
-        )}
-
-        {/* 住宿專屬圖片輸入區 */}
-        {type === 'hotel' && (
-          <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 space-y-3">
-             <h4 className="text-xs font-bold text-emerald-600 mb-2">🏨 住宿外觀圖片</h4>
-             <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1">
-                  <FontAwesomeIcon icon={faImage} className="mr-1" />
-                  圖片網址 (URL)
-                </label>
-                
-                {/* ▼▼▼ 新增：輸入框 + 搜尋按鈕的組合 ▼▼▼ */}
-                <div className="flex space-x-2">
-                  <input 
-                    type="url" 
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="flex-1 input-style text-blue-500"
-                  />
-                  <button 
-                    type="button"
-                    onClick={handleSearchImage}
-                    className="bg-emerald-200 text-emerald-700 px-3 rounded-xl text-xs font-bold hover:bg-emerald-300 transition-colors whitespace-nowrap"
-                  >
-                    <FontAwesomeIcon icon={faMagnifyingGlass} className="mr-1" />
-                    搜尋圖片
-                  </button>
-                </div>
-                {/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */}
-
-                {imageUrl && (
-                  <div className="mt-2 h-32 w-full rounded-lg overflow-hidden bg-gray-100 border border-gray-200 relative">
-                    <img src={imageUrl} alt="預覽" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                    <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-tl-lg">預覽</div>
-                  </div>
-                )}
+          
+          <div className="flex space-x-2 items-center">
+            <div className="flex-1">
+              <label className="label-sub">出發 (代碼/城市)</label>
+              <div className="flex space-x-1">
+                <input type="text" value={departCode} onChange={e => setDepartCode(e.target.value)} placeholder="TPE" className="w-14 text-center input-style font-mono uppercase" maxLength={3} />
+                <input type="text" value={departName} onChange={e => setDepartName(e.target.value)} placeholder="台北" className="flex-1 input-style" />
               </div>
+            </div>
+            <div className="text-gray-300"><FontAwesomeIcon icon={faPlane} /></div>
+            <div className="flex-1">
+              <label className="label-sub">抵達 (代碼/城市)</label>
+              <div className="flex space-x-1">
+                <input type="text" value={arriveCode} onChange={e => setArriveCode(e.target.value)} placeholder="NRT" className="w-14 text-center input-style font-mono uppercase" maxLength={3} />
+                <input type="text" value={arriveName} onChange={e => setArriveName(e.target.value)} placeholder="成田" className="flex-1 input-style" />
+              </div>
+            </div>
           </div>
-        )}
 
-        <div className="flex space-x-2">
-           <div className="flex-1">
-             <label className="block text-xs font-bold text-gray-400 mb-1">日期</label>
-             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full input-style" />
-           </div>
-           <div className="w-1/3">
-             <label className="block text-xs font-bold text-gray-400 mb-1">時間</label>
-             <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full input-style" />
-           </div>
+          <div>
+             <label className="label-sub"><FontAwesomeIcon icon={faSuitcaseRolling} className="mr-1" />行李額度</label>
+             <input type="text" value={baggage} onChange={e => setBaggage(e.target.value)} placeholder="例如：23kg x 2" className="w-full input-style" />
+          </div>
         </div>
+      )}
 
-        <div>
-           <label className="block text-xs font-bold text-gray-400 mb-1">訂位代號</label>
-           <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="6碼代號" className="w-full input-style text-orange-600 font-mono font-bold" />
+      {type !== 'flight' && (
+        <>
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 mb-1">供應商/平台</label>
+              <input type="text" value={provider} onChange={e => setProvider(e.target.value)} placeholder="例如：Agoda / Klook" className="w-full input-style" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-400 mb-1">訂單編號</label>
+              <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="Ref No." className="w-full input-style font-mono" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faLocationDot} className="mr-1"/>地址/集合點</label>
+            <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="輸入地址..." className="w-full input-style" />
+          </div>
+
+          {/* ✅ 修正 4：圖片輸入欄位，使用 image 變數 */}
+          <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+             <label className="block text-xs font-bold text-gray-400 mb-2 flex items-center">
+               <FontAwesomeIcon icon={faImage} className="mr-1" /> 封面照片 (圖片網址)
+             </label>
+             <div className="flex space-x-2">
+               <input 
+                 type="url" 
+                 value={image} 
+                 onChange={e => setImage(e.target.value)} 
+                 placeholder="https://..." 
+                 className="flex-1 input-style text-xs"
+               />
+             </div>
+             {image && (
+               <div className="mt-2 w-full h-32 rounded-lg overflow-hidden border border-gray-200 bg-white">
+                 <img 
+                   src={image} 
+                   alt="預覽" 
+                   className="w-full h-full object-cover" 
+                   onError={(e) => e.currentTarget.style.display = 'none'} 
+                 />
+               </div>
+             )}
+          </div>
+        </>
+      )}
+
+      <div className="flex space-x-2">
+        <div className="flex-1">
+          <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faCalendarDays} className="mr-1"/>日期</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full input-style" />
         </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-400 mb-1">相關連結</label>
-          <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://..." className="w-full input-style text-blue-500" />
+        <div className="flex-1">
+          <label className="block text-xs font-bold text-gray-400 mb-1"><FontAwesomeIcon icon={faClock} className="mr-1"/>時間</label>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full input-style text-center" />
         </div>
       </div>
 
-      <div className="pt-2 flex space-x-3">
-        <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold text-gray-400 bg-orange-100">取消</button>
+      {type === 'hotel' && (
+        <div>
+          <label className="block text-xs font-bold text-gray-400 mb-1">退房日期</label>
+          <input type="date" value={checkOutDate} onChange={e => setCheckOutDate(e.target.value)} className="w-full input-style" />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-bold text-gray-400 mb-1">連結 (Google Map 或 訂單頁面)</label>
+        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://" className="w-full input-style text-blue-500" />
+      </div>
+
+      <div className="pt-4 flex space-x-3">
+        <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold text-gray-400 bg-[#F2F4E7]">取消</button>
         <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-[#5C4033] shadow-lg">儲存</button>
       </div>
+
+      <style>{`
+        .input-style { background: white; border: 2px solid #F3F4F6; border-radius: 0.75rem; padding: 0.6rem 1rem; font-weight: 700; color: #5E5340; outline: none; transition: all; }
+        .input-style:focus { border-color: #FDBA74; }
+        .label-sub { font-size: 0.65rem; font-weight: 800; color: #9CA3AF; margin-bottom: 0.1rem; display: block; }
+      `}</style>
     </form>
   );
 };
