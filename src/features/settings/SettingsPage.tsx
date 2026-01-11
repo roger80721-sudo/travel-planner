@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCloudArrowUp, faCloudArrowDown, faTriangleExclamation, faFileImport, faFileExport 
@@ -18,6 +18,23 @@ const DATA_KEYS = [
 ];
 
 export const SettingsPage = () => {
+  const [tripId, setTripId] = useState('');
+
+// 初始化：讀取目前的代碼
+  useEffect(() => {
+    setTripId(localStorage.getItem('trip_id') || 'default');
+  }, []);
+
+  const handleSaveTripId = () => {
+    if (!tripId.trim()) return;
+    localStorage.setItem('trip_id', tripId.trim());
+    // 這裡用 window.confirm 會比較保險，有些環境不支援直接寫 confirm
+    if (window.confirm(`行程已切換為「${tripId}」\n按確定後網頁將重新載入。`)) {
+      window.location.reload();
+    }
+  };
+  // 👆👆👆 【新程式碼結束】 👆👆👆
+
   const [isLoading, setIsLoading] = useState(false);
 
   // 📤 匯出備份 (下載到手機)
@@ -113,6 +130,39 @@ export const SettingsPage = () => {
       <h2 className="text-2xl font-black text-[#5C4033] mb-6">設定與備份</h2>
 
       <div className="space-y-6">
+
+        {/* 👇 貼在這裡 (成為列表中的第一個卡片) */}
+      <div className="bg-white p-4 rounded-xl shadow-sm space-y-3 border border-blue-100">
+        <div className="flex items-center gap-2 mb-1">
+           <span className="text-xl">🌏</span>
+           <h3 className="font-bold text-gray-700">多行程切換</h3>
+        </div>
+        
+        <p className="text-xs text-gray-500">
+          輸入代碼來區分不同旅遊 (例如: japan, thailand)。
+        </p>
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={tripId}
+            onChange={(e) => setTripId(e.target.value)}
+            className="flex-1 p-3 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="請輸入行程代碼"
+          />
+          <button 
+            onClick={handleSaveTripId}
+            className="bg-blue-600 text-white px-5 py-2 rounded-lg font-bold text-sm shadow hover:bg-blue-700 active:scale-95 transition-all"
+          >
+            切換
+          </button>
+        </div>
+        
+        <div className="text-[10px] text-gray-400 bg-gray-50 p-2 rounded">
+          目前行程代碼: <span className="font-mono text-blue-600 font-bold">{localStorage.getItem('trip_id') || 'default'}</span>
+        </div>
+      </div>
+
         {/* 備份區塊 */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-[#F2F4E7]">
           <h3 className="font-bold text-lg text-[#5E5340] mb-2 flex items-center">
