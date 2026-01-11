@@ -14,6 +14,7 @@ export interface ExpenseItem {
   involved: string[];
   date: string;
   category?: string;
+  note?: string;
 }
 
 interface ExpenseCardProps {

@@ -32,7 +32,8 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
   const [involved, setInvolved] = useState<string[]>(members);
   
   // ▼▼▼ 新增的功能 State ▼▼▼
-  const [note, setNote] = useState(''); // 用來放翻譯明細
+  // ✅ 修改後：如果有 initialData，就讀取裡面的 note，否則為空
+  const [note, setNote] = useState(initialData?.note || ''); // 用來放翻譯明細
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); // 開放日期編輯
   const [isAnalyzing, setIsAnalyzing] = useState(false); // AI 讀取狀態
   const fileInputRef = useRef<HTMLInputElement>(null); // 隱藏的檔案上傳輸入框
@@ -46,7 +47,7 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
       setPayer(initialData.payer);
       setInvolved(initialData.involved || members);
       // 如果你的 ExpenseItem 有 note 欄位，記得這裡也要讀取
-      // setNote(initialData.note || ''); 
+      setNote(initialData.note || ''); 
       setDate(initialData.date);
     }
   }, [initialData, members]);
@@ -110,12 +111,12 @@ export const AddExpenseForm = ({ initialData, members, onSubmit, onCancel }: Add
       payer,
       involved: finalInvolved,
       date: date, // 使用 State 的日期
-      // note: note, // ★ 注意：請確認你的 ExpenseItem type 裡面有定義 note，如果沒有要加上去
+      note: note, // ★ 注意：請確認你的 ExpenseItem type 裡面有定義 note，如果沒有要加上去
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-32">
       
       {/* ▼▼▼ 新增區塊：AI 智慧記帳按鈕 ▼▼▼ */}
       <div className="flex justify-between items-center mb-2">

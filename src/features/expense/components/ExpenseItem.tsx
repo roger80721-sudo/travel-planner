@@ -10,6 +10,7 @@ export interface ExpenseRecord {
   currency: 'TWD' | 'JPY'; // 幣別
   category: 'food' | 'shopping' | 'transport' | 'ticket' | 'other';
   date: string;
+  note?: string;
 }
 
 const CATEGORY_CONFIG = {
