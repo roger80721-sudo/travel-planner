@@ -4,6 +4,7 @@ import {
   faLocationDot, faClock, faCloudSun, faLightbulb, faScroll, 
   faLocationArrow, faBookOpen, faNoteSticky 
 } from '@fortawesome/free-solid-svg-icons';
+import { faCarSide, faCopy } from '@fortawesome/free-solid-svg-icons';
 
 export interface ScheduleItem {
   id: string;
@@ -17,6 +18,7 @@ export interface ScheduleItem {
   historyDescription?: string;
   // ▼▼▼ 新增：備註欄位 ▼▼▼
   notes?: string; 
+  mapCode?: string;
 }
 
 const TYPE_CONFIG = {
@@ -114,6 +116,33 @@ export const TimelineItem = ({ item, isLast, onEditClick, onFactClick }: Timelin
               </span>
             )}
           </div>
+          
+          {item.mapCode && (
+            <div className="mt-3 bg-blue-50 rounded-lg p-2 border border-blue-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500 w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                  <FontAwesomeIcon icon={faCarSide} size="sm" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Map Code</p>
+                  <p className="text-lg font-mono font-black text-blue-800 tracking-widest leading-none">
+                    {item.mapCode}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // 防止觸發卡片點擊
+                  navigator.clipboard.writeText(item.mapCode!);
+                  alert('已複製 Map Code！');
+                }}
+                className="p-2 text-blue-300 hover:text-blue-600 active:scale-90 transition"
+              >
+                <FontAwesomeIcon icon={faCopy} />
+              </button>
+            </div>
+          )}
 
           {/* ▼▼▼ 新增：備註顯示區塊 ▼▼▼ */}
           {item.notes && (

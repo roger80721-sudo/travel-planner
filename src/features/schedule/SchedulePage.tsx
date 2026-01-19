@@ -15,6 +15,7 @@ export interface ScheduleDay {
   date: string;
   dayOfWeek: string;
   items: ScheduleItem[];
+  mapCode?: string;
 }
 
 // 預設資料

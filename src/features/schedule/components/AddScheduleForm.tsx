@@ -6,6 +6,7 @@ import {
   faWandMagicSparkles, faSpinner, faCloudBolt, faNoteSticky
 } from '@fortawesome/free-solid-svg-icons';
 import type { ScheduleItem } from './TimelineItem';
+import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
 const TYPE_OPTIONS = [
   { value: 'activity', label: '景點/活動', icon: faCamera, color: 'bg-green-500' },
@@ -20,6 +21,7 @@ const WEATHER_OPTIONS = [
   { value: 'cloudy', label: '多雲', icon: '☁️' },
   { value: 'rainy', label: '下雨', icon: '🌧️' },
 ];
+
 
 interface AddScheduleFormProps {
   initialData?: ScheduleItem | null;
@@ -44,6 +46,7 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
   
   const [isSearching, setIsSearching] = useState(false);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+  const [mapCode, setMapCode] = useState(initialData?.mapCode || '');
 
   useEffect(() => {
     if (initialData) {
@@ -171,9 +174,27 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
       notes, // 儲存備註
       coldKnowledge: type === 'activity' ? coldKnowledge : undefined,
       historyDescription: type === 'activity' ? historyDescription : undefined,
+      mapCode: mapCode
     });
   };
 
+  const handleSearchMapCode = () => {
+    // 1. 優先使用「地點」欄位
+    // 2. 如果地點是空的，才退而求其次使用「標題」
+    const searchTerm = location.trim() ? location : title;
+
+    if (!searchTerm) {
+      alert('請先輸入地點名稱！');
+      return;
+    }
+
+    // 搜尋關鍵字：地點 + map code
+    const query = `${searchTerm} map code`;
+    
+    // 開啟 Google 搜尋頁面
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+  };
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
       <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
@@ -216,6 +237,33 @@ export const AddScheduleForm = ({ initialData, date, onSubmit, onDelete, onCance
           <label className="label-text"><FontAwesomeIcon icon={faLocationDot} className="mr-1" />地點/地址</label>
           <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="建議填寫，以便查詢天氣" className="input-style w-full" />
         </div>
+
+        {/* 👇 新增：Map Code 輸入區塊 */}
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 font-bold">自駕導航 Map Code</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={mapCode}
+            onChange={(e) => setMapCode(e.target.value)}
+            placeholder="例如: 33 234 567*89"
+            className="flex-1 p-3 border rounded-lg bg-gray-50 font-mono text-blue-600 tracking-wider focus:ring-2 focus:ring-blue-400 outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleSearchMapCode}
+            className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 active:scale-95 transition flex items-center gap-2 whitespace-nowrap"
+          >
+            <FontAwesomeIcon icon={faSearch} />
+            <span className="text-xs font-bold">找代碼</span>
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-400">
+          *點擊「找代碼」可快速搜尋該地點的 Map Code
+        </p>
+      </div>
+
+        
 
         {/* ▼▼▼ 新增：備註輸入框 ▼▼▼ */}
         <div>
