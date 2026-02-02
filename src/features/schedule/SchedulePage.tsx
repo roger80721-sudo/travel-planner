@@ -15,7 +15,7 @@ export interface ScheduleDay {
   date: string;
   dayOfWeek: string;
   items: ScheduleItem[];
-  mapCode?: string;
+  
 }
 
 // 預設資料
@@ -41,7 +41,19 @@ export const SchedulePage = () => {
   const [tripTitle, setTripTitle] = useState('我的日本之旅 🇯🇵');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
 
-  const [selectedDate, setSelectedDate] = useState('');
+  const tripId = localStorage.getItem('trip_id') || 'default';
+  // 2. 修改原本的 selectedDate (讓它優先讀取上次的紀錄)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const savedDate = localStorage.getItem(`${tripId}_last_viewed_date`);
+    // 如果有存檔，就用存檔的；沒有的話就維持空字串 (等讀取完資料會自動帶入第一天)
+    return savedDate || '';
+  });
+  // 3. 新增監聽：只要使用者切換日期，就立刻記住
+  useEffect(() => {
+    if (selectedDate) {
+      localStorage.setItem(`${tripId}_last_viewed_date`, selectedDate);
+    }
+  }, [selectedDate, tripId]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDateManageOpen, setIsDateManageOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
